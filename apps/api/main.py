@@ -225,7 +225,8 @@ def list_signals(slug: str, source: Optional[str] = None, kind: Optional[str] = 
     cur.execute(q, p); rows = cur.fetchall()
     cur.execute("SELECT COUNT(*) FROM signals WHERE tenant_id=%s", (tid,))
     total = cur.fetchone()["count"]; conn.close()
-    return {"signals": [_ser(r) for r in rows], "total": total}
+    page = offset // limit + 1
+    return {"items": [_ser(r) for r in rows], "total": total, "page": page, "page_size": limit}
 
 
 @app.get("/api/tenants/{slug}/signals/{sig_id}")
@@ -249,10 +250,14 @@ def list_gaps(slug: str, status: Optional[str] = None):
     return [_ser(r) for r in rows]
 
 
-# ═══ REFLECTION LOOP (Checkpoint 3 — stub) ═══
+# ═══ REFLECTION LOOP ═══
 @app.post("/api/reflection/run")
 def run_reflection():
-    return {"status": "not_implemented", "message": "Requires ANTHROPIC_API_KEY (Checkpoint 3)"}
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from apps.api.reflection import run_reflection_loop
+    result = run_reflection_loop("acme_robotics")
+    return result
 
 
 # ═══ DASHBOARD ═══
