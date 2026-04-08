@@ -260,6 +260,183 @@ def run_reflection():
     return result
 
 
+# ═══ GENERATOR (Checkpoint 4) ═══
+@app.post("/api/tenants/{slug}/generator/generate")
+def generate_from_gap(slug: str, body: dict):
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from apps.api.generator import generate_capability
+    gap_id = body.get("gap_id")
+    if not gap_id:
+        raise HTTPException(400, "gap_id required")
+    return generate_capability(gap_id, slug)
+
+
+@app.post("/api/tenants/{slug}/generator/generate-all")
+def generate_all(slug: str):
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from apps.api.generator import generate_all_from_gaps
+    return generate_all_from_gaps(slug)
+
+
+# ═══ ARENA + FITNESS (Checkpoint 5) ═══
+@app.post("/api/tenants/{slug}/arena/evaluate/{cap_id}")
+def evaluate_capability(slug: str, cap_id: str):
+    """Run eval suite for a capability in the sandbox, compute fitness."""
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from packages.sandbox.runner import SandboxRunner, CapabilityManifest
+    conn = get_db(); cur = _dict_cur(conn)
+    cur.execute("SELECT * FROM capabilities WHERE id = %s", (cap_id,))
+    cap = cur.fetchone()
+    if not cap:
+        conn.close(); raise HTTPException(404, "Capability not found")
+
+    # Write code to temp file and run eval
+    import tempfile
+    from pathlib import Path
+    skills_dir = Path(__file__).parent.parent.parent / "packages" / "skills" / "generated" / cap["slug"]
+    code_path = skills_dir / "capability.py"
+    eval_path = skills_dir / "eval.jsonl"
+
+    if not code_path.exists():
+        conn.close()
+        return {"error": "No capability code on disk", "slug": cap["slug"]}
+
+    manifest = CapabilityManifest(
+        id=cap["slug"], name=cap["name"], kind=cap["kind"],
+        code_path=str(code_path), tools=[], budget_monthly_usd=float(cap["budget_monthly_usd"]),
+    )
+
+    if not eval_path.exists():
+        conn.close()
+        return {"error": "No eval suite on disk"}
+
+    results = SandboxRunner.run_eval(manifest, str(eval_path))
+    passed = sum(1 for r in results if r["passed"])
+    total = len(results)
+    success_rate = passed / total if total > 0 else 0
+    avg_latency = sum(r["duration_ms"] for r in results) / total if total > 0 else 0
+    cost_per_run = sum(r.get("cost_usd", 0.001) for r in results) / total if total > 0 else 0
+
+    # Fitness = 0.5*success + 0.2*(1-cost_norm) + 0.2*(1-latency_norm) + 0.1*trust_delta
+    cost_norm = min(1.0, cost_per_run / 0.01)  # $0.01 is expensive
+    latency_norm = min(1.0, avg_latency / 5000)  # 5s is slow
+    trust_delta = 0.1 if success_rate > 0.7 else -0.1
+    composite = round(0.5 * success_rate + 0.2 * (1 - cost_norm) + 0.2 * (1 - latency_norm) + 0.1 * trust_delta, 4)
+
+    # Write fitness score
+    cur.execute("""INSERT INTO fitness_scores (capability_id, generation, success_rate, avg_latency_ms,
+        cost_per_run_usd, trust_delta, automation_delta, composite)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *""",
+        (cap_id, cap["generation"], round(success_rate, 4), int(avg_latency),
+         round(cost_per_run, 4), round(trust_delta, 4), 0.0, composite))
+    fitness = dict(cur.fetchone())
+    conn.close()
+
+    return {
+        "capability_id": cap_id,
+        "eval_results": {"passed": passed, "total": total, "success_rate": round(success_rate, 3)},
+        "fitness": {"composite": composite, "success_rate": round(success_rate, 4),
+                    "avg_latency_ms": int(avg_latency), "cost_per_run": round(cost_per_run, 4)},
+        "details": [{"case": r["case"], "passed": r["passed"], "duration_ms": r["duration_ms"]} for r in results],
+    }
+
+
+# ═══ GOVERNANCE STAGE TRANSITIONS (Checkpoint 5) ═══
+@app.post("/api/tenants/{slug}/capabilities/{cap_id}/transition")
+def transition_capability(slug: str, cap_id: str, body: dict):
+    """Propose a stage transition for a capability. Creates governance event."""
+    to_stage = body.get("to_stage")
+    actor = body.get("actor", "system")
+    rationale = body.get("rationale", "")
+    if not to_stage:
+        raise HTTPException(400, "to_stage required")
+
+    conn = get_db(); cur = _dict_cur(conn); tid = _tenant_id(cur, slug)
+    cur.execute("SELECT * FROM capabilities WHERE id = %s", (cap_id,))
+    cap = cur.fetchone()
+    if not cap:
+        conn.close(); raise HTTPException(404, "Not found")
+
+    from_stage = cap["stage"]
+
+    # Validate transition
+    valid = {
+        "proposed": ["shadow", "archived"],
+        "shadow": ["canary", "proposed"],
+        "canary": ["production", "shadow"],
+        "production": ["retiring"],
+        "retiring": ["deprecated"],
+    }
+    if to_stage not in valid.get(from_stage, []):
+        conn.close()
+        raise HTTPException(400, f"Invalid transition {from_stage} -> {to_stage}")
+
+    # Hash chain
+    cur.execute("SELECT this_hash FROM governance_events WHERE tenant_id = %s ORDER BY id DESC LIMIT 1", (tid,))
+    prev = cur.fetchone()
+    prev_hash = prev["this_hash"] if prev else ""
+    import hashlib
+    event_data = json.dumps({"cap": cap_id, "from": from_stage, "to": to_stage,
+        "actor": actor, "prev": prev_hash}, sort_keys=True)
+    this_hash = hashlib.sha256(event_data.encode()).hexdigest()
+
+    decision = "approve" if to_stage in ["shadow", "canary", "production"] else "rollback"
+    cur.execute("""INSERT INTO governance_events (tenant_id, capability_id, from_stage, to_stage, decision, actor, rationale, prev_hash, this_hash)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *""",
+        (tid, cap_id, from_stage, to_stage, decision, actor, rationale, prev_hash, this_hash))
+    gov = dict(cur.fetchone())
+
+    # Update capability stage
+    cur.execute("UPDATE capabilities SET stage = %s WHERE id = %s", (to_stage, cap_id))
+    conn.close()
+
+    return {"governance_event": _ser(gov), "capability_id": cap_id, "from": from_stage, "to": to_stage}
+
+
+# ═══ GOVERNANCE CHAIN VERIFICATION ═══
+@app.get("/api/tenants/{slug}/governance/verify")
+def verify_chain(slug: str):
+    """Walk the hash chain and verify integrity."""
+    conn = get_db(); cur = _dict_cur(conn); tid = _tenant_id(cur, slug)
+    cur.execute("SELECT id, prev_hash, this_hash FROM governance_events WHERE tenant_id = %s ORDER BY id", (tid,))
+    events = cur.fetchall()
+    conn.close()
+
+    if not events:
+        return {"valid": True, "chain_length": 0}
+
+    for i, evt in enumerate(events):
+        if i == 0:
+            continue
+        if evt["prev_hash"] != events[i-1]["this_hash"]:
+            return {"valid": False, "broken_at": evt["id"], "expected": events[i-1]["this_hash"], "got": evt["prev_hash"]}
+
+    return {"valid": True, "chain_length": len(events)}
+
+
+# ═══ DEMO RESET (Checkpoint 6) ═══
+@app.post("/api/demo/reset")
+def demo_reset():
+    """Reset Acme tenant to t+0 state."""
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT id FROM tenants WHERE slug = 'acme_robotics'")
+    row = cur.fetchone()
+    if not row:
+        conn.close(); return {"error": "No acme tenant"}
+    tid = row[0]
+    cur.execute("DELETE FROM fitness_scores WHERE capability_id IN (SELECT id FROM capabilities WHERE tenant_id = %s)", (tid,))
+    cur.execute("DELETE FROM governance_events WHERE tenant_id = %s", (tid,))
+    cur.execute("DELETE FROM capabilities WHERE tenant_id = %s", (tid,))
+    cur.execute("DELETE FROM capability_gaps WHERE tenant_id = %s", (tid,))
+    cur.execute("UPDATE signals SET clustered_into = NULL, embedding = NULL WHERE tenant_id = %s", (tid,))
+    conn.commit()
+    conn.close()
+    return {"status": "reset", "tenant": "acme_robotics"}
+
+
 # ═══ DASHBOARD ═══
 @app.get("/api/tenants/{slug}/dashboard")
 def dashboard(slug: str):
