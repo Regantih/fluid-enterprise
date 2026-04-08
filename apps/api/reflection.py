@@ -24,7 +24,18 @@ import psycopg2.extras
 logger = logging.getLogger("reflection")
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://fluid:fluid_dev_2026@localhost:5432/fluid_enterprise")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+# Load from .env if not in environment
+def _load_api_key():
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key:
+        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
+        if os.path.exists(env_path):
+            for line in open(env_path):
+                if line.startswith("ANTHROPIC_API_KEY="):
+                    key = line.strip().split("=", 1)[1]
+    return key
+
+ANTHROPIC_API_KEY = _load_api_key()
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # 384-dim, fast, good clustering
 EMBEDDING_DIM = 384
 
@@ -365,6 +376,8 @@ def _analyze_cluster(tenant_id: str, cluster: dict) -> Optional[dict]:
 def _analyze_with_claude(tenant_id: str, cluster: dict) -> Optional[dict]:
     """Call Claude Sonnet 4.5 with the Reflection Loop prompt."""
     import httpx
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     from packages.shared.prompts import REFLECTION_LOOP_PROMPT
 
     # Build signal summaries for the prompt
@@ -401,15 +414,30 @@ def _analyze_with_claude(tenant_id: str, cluster: dict) -> Optional[dict]:
             },
             json={
                 "model": "claude-sonnet-4-5",
-                "max_tokens": 1024,
+                "max_tokens": 1500,
                 "system": prompt,
                 "messages": [{"role": "user", "content": user_msg}],
             },
-            timeout=30,
+            timeout=45,
         )
         if resp.status_code == 200:
             content = resp.json()["content"][0]["text"]
-            return json.loads(content)
+            # Claude may wrap JSON in markdown code blocks
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                import re
+                match = re.search(r'\{[\s\S]*\}', content)
+                if match:
+                    parsed = json.loads(match.group())
+                    # Add signal IDs from cluster if Claude didn't include them
+                    if parsed.get("is_gap") and not parsed.get("evidence_signal_ids"):
+                        parsed["evidence_signal_ids"] = cluster["signal_ids"][:20]
+                    if parsed.get("is_gap") and not parsed.get("signal_count"):
+                        parsed["signal_count"] = cluster["signal_count"]
+                    return parsed
+                logger.error(f"Could not parse Claude response: {content[:200]}")
+                return None
         else:
             logger.error(f"Claude API error: {resp.status_code} {resp.text[:200]}")
             return None
