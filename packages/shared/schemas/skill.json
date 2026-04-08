@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SKILL.md Frontmatter",
+  "description": "Schema for Fluid Enterprise capability manifests. Every generated capability must validate against this schema.",
+  "type": "object",
+  "required": [
+    "id", "name", "kind", "version", "generation", "stage", "owner",
+    "budget_monthly_usd", "inputs", "outputs", "fitness_objective", "eval_suite"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^cap_[a-z0-9_]+$",
+      "description": "Unique capability identifier, e.g. cap_vendor_risk_triage"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 80,
+      "description": "Human-readable capability name"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["skill", "agent", "workflow"],
+      "description": "skill = single function, agent = stateful loop, workflow = multi-step DAG"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Evolution generation that produced this capability"
+    },
+    "parent": {
+      "type": ["string", "null"],
+      "description": "ID of parent capability this mutated from, null if de novo"
+    },
+    "stage": {
+      "type": "string",
+      "enum": ["proposed", "evaluating", "staging", "production", "retiring", "archived"],
+      "description": "Lifecycle stage governed by the Evolution Engine"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Tenant or team that owns this capability"
+    },
+    "budget_monthly_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Maximum monthly spend in USD. Hard stop when reached."
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "description"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "description": { "type": "string" },
+          "required": { "type": "boolean", "default": true }
+        }
+      },
+      "description": "Typed input parameters the capability accepts"
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "description"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      },
+      "description": "Typed output values the capability produces"
+    },
+    "tools": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "External tools this capability is allowed to call (allowlisted)"
+    },
+    "policies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Governance policies that apply: e.g. 'requires_human_approval_above_10k'"
+    },
+    "fitness_objective": {
+      "type": "string",
+      "description": "What fitness means for this capability — the objective function. E.g. 'Minimize vendor risk exposure score across portfolio'"
+    },
+    "eval_suite": {
+      "type": "string",
+      "description": "Path to JSONL evaluation file relative to capability directory"
+    }
+  },
+  "additionalProperties": false
+}

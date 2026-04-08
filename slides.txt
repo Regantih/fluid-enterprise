@@ -1,0 +1,17 @@
+file 'screenshots/dashboard.png'
+duration 30
+file 'screenshots/capability-registry.png'
+duration 25
+file 'screenshots/governance-board.png'
+duration 30
+file 'screenshots/heartbeat-monitor.png'
+duration 28
+file 'screenshots/migration-planner.png'
+duration 25
+file 'screenshots/cost-dashboard.png'
+duration 22
+file 'screenshots/activity-log.png'
+duration 22
+file 'screenshots/composition-engine.png'
+duration 19
+file 'screenshots/composition-engine.png'
