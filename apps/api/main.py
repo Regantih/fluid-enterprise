@@ -83,6 +83,16 @@ async def lifespan(app: FastAPI):
         logger.info("Redis connected.")
     except Exception as e:
         logger.warning(f"Redis fail (non-fatal): {e}")
+    # Seed external agents
+    try:
+        import sys as _sys
+        _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        from apps.api.agent_gateway import seed_external_agents, seed_interactions
+        seed_external_agents("acme_robotics")
+        seed_interactions("acme_robotics")
+    except Exception as e:
+        logger.warning(f"Agent gateway seed: {e}")
+
     yield
     logger.info("Fluid Enterprise API shutting down.")
 
@@ -435,6 +445,58 @@ def demo_reset():
     conn.commit()
     conn.close()
     return {"status": "reset", "tenant": "acme_robotics"}
+
+
+# ═══ AGENT GATEWAY (External Agents) ═══
+@app.get("/api/tenants/{slug}/external-agents")
+def list_external_agents(slug: str, kind: Optional[str] = None):
+    conn = get_db(); cur = _dict_cur(conn); tid = _tenant_id(cur, slug)
+    q = "SELECT * FROM external_agents WHERE tenant_id=%s"
+    p: list = [tid]
+    if kind: q += " AND kind=%s"; p.append(kind)
+    q += " ORDER BY trust_score DESC"
+    cur.execute(q, p); rows = cur.fetchall(); conn.close()
+    return [_ser(r) for r in rows]
+
+
+@app.get("/api/tenants/{slug}/external-agents/{agent_id}")
+def get_external_agent(slug: str, agent_id: str):
+    conn = get_db(); cur = _dict_cur(conn)
+    cur.execute("SELECT * FROM external_agents WHERE id=%s", (agent_id,))
+    agent = cur.fetchone()
+    if not agent: conn.close(); raise HTTPException(404, "Not found")
+    cur.execute("SELECT * FROM agent_interactions WHERE external_agent_id=%s ORDER BY created_at DESC LIMIT 20", (agent_id,))
+    interactions = cur.fetchall(); conn.close()
+    return {**_ser(agent), "recent_interactions": [_ser(i) for i in interactions]}
+
+
+@app.get("/api/tenants/{slug}/interactions")
+def list_interactions(slug: str, kind: Optional[str] = None, status: Optional[str] = None, limit: int = 50):
+    conn = get_db(); cur = _dict_cur(conn); tid = _tenant_id(cur, slug)
+    q = "SELECT i.*, e.name as agent_name, e.organization, e.kind as agent_kind, e.trust_score as agent_trust FROM agent_interactions i JOIN external_agents e ON i.external_agent_id=e.id WHERE i.tenant_id=%s"
+    p: list = [tid]
+    if kind: q += " AND e.kind=%s"; p.append(kind)
+    if status: q += " AND i.status=%s"; p.append(status)
+    q += " ORDER BY i.created_at DESC LIMIT %s"; p.append(limit)
+    cur.execute(q, p); rows = cur.fetchall()
+    cur.execute("SELECT count(*) FROM agent_interactions WHERE tenant_id=%s", (tid,))
+    total = cur.fetchone()["count"]; conn.close()
+    return {"items": [_ser(r) for r in rows], "total": total}
+
+
+@app.get("/api/tenants/{slug}/gateway/stats")
+def gateway_stats(slug: str):
+    conn = get_db(); cur = _dict_cur(conn); tid = _tenant_id(cur, slug)
+    cur.execute("SELECT count(*) as total, count(*) FILTER (WHERE kind='vendor') as vendors, count(*) FILTER (WHERE kind='customer') as customers FROM external_agents WHERE tenant_id=%s", (tid,))
+    agents = dict(cur.fetchone())
+    cur.execute("SELECT count(*) as total, count(*) FILTER (WHERE status='completed') as completed, count(*) FILTER (WHERE status='escalated') as escalated, count(*) FILTER (WHERE governance_required) as governed, avg(latency_ms) as avg_latency FROM agent_interactions WHERE tenant_id=%s", (tid,))
+    interactions = dict(cur.fetchone())
+    cur.execute("SELECT interaction_type, count(*) as cnt FROM agent_interactions WHERE tenant_id=%s GROUP BY interaction_type ORDER BY cnt DESC", (tid,))
+    by_type = {r["interaction_type"]: r["cnt"] for r in cur.fetchall()}
+    cur.execute("SELECT e.kind, avg(e.trust_score) as avg_trust FROM external_agents e WHERE e.tenant_id=%s GROUP BY e.kind", (tid,))
+    trust_by_kind = {r["kind"]: round(float(r["avg_trust"]), 4) for r in cur.fetchall()}
+    conn.close()
+    return {"agents": agents, "interactions": {**interactions, "avg_latency_ms": round(float(interactions["avg_latency"] or 0))}, "by_type": by_type, "trust_by_kind": trust_by_kind}
 
 
 # ═══ DASHBOARD ═══
