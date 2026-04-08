@@ -1,0 +1,21 @@
+Every enterprise you admire was built to resist change. Stability was the competitive advantage. That equation just broke. The smartest people in your organization spend more than half their working day operating software. Not thinking, not creating, not leading. Operating.
+
+We built the ERP era around process automation. It worked. Then we added modularity. It worked. But each layer made the next transformation harder and more expensive. The system is self-defeating.
+
+This is the Fluid Enterprise. The first ERP built on the principles of AlphaGo, AlphaZero, and AlphaEvolve. A self-evolving organizational framework where agents run the enterprise, and request human assistance. Not the other way around.
+
+At its center is Archon. The operating system of the company itself. Archon receives human intent and translates it into orchestrated action across the entire agent hierarchy. You tell it what you want. It figures out how to make it happen.
+
+Persistent capability teams called Guilds form around domains. Finance. Supply Chain. Customer Intelligence. People and Culture. Engineering. These are living capability clusters, governed by the speed of intent, not the speed of the planning calendar.
+
+Every agent earns trust through behavior. The EigenTrust reputation system calculates trust continuously from behavioral history. It cannot be assigned by title. It cannot be gamed. An agent that operates cleanly earns autonomy. An agent that deviates loses it instantly.
+
+The Council Protocol means agents continuously peer-review each other's decisions. No single bad actor, human or machine, can operate undetected. Every consequential action requires consensus from a rotating peer group.
+
+When machine confidence drops below a defined threshold, humans are brought back in immediately. We maintain sovereignty not through policy, but through mathematical triggers that cannot be overridden.
+
+And it evolves. Every generation, the system improves. Mutations in decision boundaries. Refinements in risk appetite. Cross-domain knowledge transfer. The fitness score climbs with each cycle, just like AlphaZero learning to play chess from scratch.
+
+This is not automation layered onto existing structures. This is a fundamentally different operating hierarchy. Intent flows from human leadership through Archon into agent teams. Traditional org charts dissolve.
+
+This is open architecture. If you are a builder who understands that the ERP era is over and the agent era has begun, the manifesto is waiting. The future of the enterprise is fluid.

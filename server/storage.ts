@@ -1,14 +1,14 @@
 import {
-  type Guild, type InsertGuild, guilds,
+  type Capability, type InsertCapability, capabilities,
   type Agent, type InsertAgent, agents,
-  type Skill, type InsertSkill, skills,
-  type Decision, type InsertDecision, decisions,
-  type Escalation, type InsertEscalation, escalations,
-  type EvolutionGeneration, type InsertEvolution, evolutionGenerations,
-  type CouncilReview, type InsertCouncilReview, councilReviews,
-  type Intent, type InsertIntent, intents,
+  type Task, type InsertTask, tasks,
+  type Governance, type InsertGovernance, governance,
+  type CostEvent, type InsertCostEvent, costEvents,
   type Activity, type InsertActivity, activityLog,
-  type Metric, type InsertMetric, metrics,
+  type Migration, type InsertMigration, migrationMap,
+  type CompositionLink, type InsertCompositionLink, compositionLinks,
+  type Evolution, type InsertEvolution, evolutionLog,
+  type CouncilReview, type InsertCouncilReview, councilReviews,
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
@@ -19,179 +19,248 @@ sqlite.pragma("journal_mode = WAL");
 export const db = drizzle(sqlite);
 
 export interface IStorage {
-  // Guilds
-  getGuilds(): Guild[];
-  getGuild(id: number): Guild | undefined;
-  createGuild(g: InsertGuild): Guild;
-  updateGuild(id: number, data: Partial<InsertGuild>): Guild | undefined;
+  // Capabilities
+  getCapabilities(): Capability[];
+  getCapabilityById(id: number): Capability | undefined;
+  createCapability(c: InsertCapability): Capability;
+  updateCapability(id: number, data: Partial<InsertCapability>): Capability | undefined;
 
   // Agents
   getAgents(): Agent[];
-  getAgentsByGuild(guildId: number): Agent[];
-  getAgent(id: number): Agent | undefined;
+  getAgentsByCapability(capabilityId: number): Agent[];
+  getAgentById(id: number): Agent | undefined;
   createAgent(a: InsertAgent): Agent;
   updateAgent(id: number, data: Partial<InsertAgent>): Agent | undefined;
 
-  // Skills
-  getSkills(): Skill[];
-  createSkill(s: InsertSkill): Skill;
+  // Tasks
+  getTasks(): Task[];
+  getTasksByCapability(capabilityId: number): Task[];
+  createTask(t: InsertTask): Task;
+  updateTask(id: number, data: Partial<InsertTask>): Task | undefined;
 
-  // Decisions
-  getDecisions(limit?: number): Decision[];
-  getDecisionsByAgent(agentId: number): Decision[];
-  createDecision(d: InsertDecision): Decision;
-  updateDecision(id: number, data: Partial<InsertDecision>): Decision | undefined;
+  // Governance
+  getGovernance(): Governance[];
+  getPendingGovernance(): Governance[];
+  createGovernance(g: InsertGovernance): Governance;
+  updateGovernance(id: number, data: Partial<InsertGovernance>): Governance | undefined;
 
-  // Escalations
-  getEscalations(): Escalation[];
-  getPendingEscalations(): Escalation[];
-  createEscalation(e: InsertEscalation): Escalation;
-  updateEscalation(id: number, data: Partial<InsertEscalation>): Escalation | undefined;
-
-  // Evolution
-  getEvolutionHistory(limit?: number): EvolutionGeneration[];
-  createEvolution(e: InsertEvolution): EvolutionGeneration;
-
-  // Council Reviews
-  getCouncilReviews(limit?: number): CouncilReview[];
-  createCouncilReview(r: InsertCouncilReview): CouncilReview;
-
-  // Intents
-  getIntents(limit?: number): Intent[];
-  createIntent(i: InsertIntent): Intent;
-  updateIntent(id: number, data: Partial<InsertIntent>): Intent | undefined;
+  // Cost Events
+  getCostEvents(): CostEvent[];
+  getCostEventsByCapability(capabilityId: number): CostEvent[];
+  createCostEvent(e: InsertCostEvent): CostEvent;
+  getDailyTotals(days?: number): { day: number; total: number }[];
 
   // Activity Log
   getActivity(limit?: number): Activity[];
   createActivity(a: InsertActivity): Activity;
 
-  // Metrics
-  getLatestMetrics(): Metric[];
-  createMetric(m: InsertMetric): Metric;
+  // Migration Map
+  getMigrations(): Migration[];
+  createMigration(m: InsertMigration): Migration;
+  updateMigration(id: number, data: Partial<InsertMigration>): Migration | undefined;
+
+  // Composition Links
+  getCompositionLinks(): CompositionLink[];
+  createCompositionLink(l: InsertCompositionLink): CompositionLink;
+
+  // Evolution Log
+  getEvolutionHistory(limit?: number): Evolution[];
+  createEvolution(e: InsertEvolution): Evolution;
+
+  // Council Reviews
+  getCouncilReviews(limit?: number): CouncilReview[];
+  createCouncilReview(r: InsertCouncilReview): CouncilReview;
 }
 
 export class DatabaseStorage implements IStorage {
-  // Guilds
-  getGuilds(): Guild[] {
-    return db.select().from(guilds).all();
-  }
-  getGuild(id: number): Guild | undefined {
-    return db.select().from(guilds).where(eq(guilds.id, id)).get();
-  }
-  createGuild(g: InsertGuild): Guild {
-    return db.insert(guilds).values(g).returning().get();
-  }
-  updateGuild(id: number, data: Partial<InsertGuild>): Guild | undefined {
-    return db.update(guilds).set(data).where(eq(guilds.id, id)).returning().get();
+  // ─── Capabilities ───────────────────────────────────────────────────────────
+  getCapabilities(): Capability[] {
+    return db.select().from(capabilities).orderBy(capabilities.id).all();
   }
 
-  // Agents
+  getCapabilityById(id: number): Capability | undefined {
+    return db.select().from(capabilities).where(eq(capabilities.id, id)).get();
+  }
+
+  createCapability(c: InsertCapability): Capability {
+    return db.insert(capabilities).values(c).returning().get();
+  }
+
+  updateCapability(id: number, data: Partial<InsertCapability>): Capability | undefined {
+    return db
+      .update(capabilities)
+      .set({ ...data, updatedAt: new Date().toISOString() })
+      .where(eq(capabilities.id, id))
+      .returning()
+      .get();
+  }
+
+  // ─── Agents ─────────────────────────────────────────────────────────────────
   getAgents(): Agent[] {
-    return db.select().from(agents).all();
+    return db.select().from(agents).orderBy(agents.id).all();
   }
-  getAgentsByGuild(guildId: number): Agent[] {
-    return db.select().from(agents).where(eq(agents.guildId, guildId)).all();
+
+  getAgentsByCapability(capabilityId: number): Agent[] {
+    return db.select().from(agents).where(eq(agents.capabilityId, capabilityId)).all();
   }
-  getAgent(id: number): Agent | undefined {
+
+  getAgentById(id: number): Agent | undefined {
     return db.select().from(agents).where(eq(agents.id, id)).get();
   }
+
   createAgent(a: InsertAgent): Agent {
     return db.insert(agents).values(a).returning().get();
   }
+
   updateAgent(id: number, data: Partial<InsertAgent>): Agent | undefined {
     return db.update(agents).set(data).where(eq(agents.id, id)).returning().get();
   }
 
-  // Skills
-  getSkills(): Skill[] {
-    return db.select().from(skills).all();
-  }
-  createSkill(s: InsertSkill): Skill {
-    return db.insert(skills).values(s).returning().get();
+  // ─── Tasks ───────────────────────────────────────────────────────────────────
+  getTasks(): Task[] {
+    return db.select().from(tasks).orderBy(desc(tasks.createdAt)).all();
   }
 
-  // Decisions
-  getDecisions(limit = 50): Decision[] {
-    return db.select().from(decisions).orderBy(desc(decisions.createdAt)).limit(limit).all();
-  }
-  getDecisionsByAgent(agentId: number): Decision[] {
-    return db.select().from(decisions).where(eq(decisions.agentId, agentId)).all();
-  }
-  createDecision(d: InsertDecision): Decision {
-    return db.insert(decisions).values(d).returning().get();
-  }
-  updateDecision(id: number, data: Partial<InsertDecision>): Decision | undefined {
-    return db.update(decisions).set(data).where(eq(decisions.id, id)).returning().get();
+  getTasksByCapability(capabilityId: number): Task[] {
+    return db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.capabilityId, capabilityId))
+      .orderBy(desc(tasks.createdAt))
+      .all();
   }
 
-  // Escalations
-  getEscalations(): Escalation[] {
-    return db.select().from(escalations).orderBy(desc(escalations.createdAt)).all();
-  }
-  getPendingEscalations(): Escalation[] {
-    return db.select().from(escalations).where(eq(escalations.status, "pending")).all();
-  }
-  createEscalation(e: InsertEscalation): Escalation {
-    return db.insert(escalations).values(e).returning().get();
-  }
-  updateEscalation(id: number, data: Partial<InsertEscalation>): Escalation | undefined {
-    return db.update(escalations).set(data).where(eq(escalations.id, id)).returning().get();
+  createTask(t: InsertTask): Task {
+    return db.insert(tasks).values(t).returning().get();
   }
 
-  // Evolution
-  getEvolutionHistory(limit = 30): EvolutionGeneration[] {
-    return db.select().from(evolutionGenerations).orderBy(desc(evolutionGenerations.createdAt)).limit(limit).all();
-  }
-  createEvolution(e: InsertEvolution): EvolutionGeneration {
-    return db.insert(evolutionGenerations).values(e).returning().get();
+  updateTask(id: number, data: Partial<InsertTask>): Task | undefined {
+    return db.update(tasks).set(data).where(eq(tasks.id, id)).returning().get();
   }
 
-  // Council Reviews
-  getCouncilReviews(limit = 20): CouncilReview[] {
-    return db.select().from(councilReviews).orderBy(desc(councilReviews.createdAt)).limit(limit).all();
-  }
-  createCouncilReview(r: InsertCouncilReview): CouncilReview {
-    return db.insert(councilReviews).values(r).returning().get();
+  // ─── Governance ──────────────────────────────────────────────────────────────
+  getGovernance(): Governance[] {
+    return db.select().from(governance).orderBy(desc(governance.createdAt)).all();
   }
 
-  // Intents
-  getIntents(limit = 20): Intent[] {
-    return db.select().from(intents).orderBy(desc(intents.createdAt)).limit(limit).all();
-  }
-  createIntent(i: InsertIntent): Intent {
-    return db.insert(intents).values(i).returning().get();
-  }
-  updateIntent(id: number, data: Partial<InsertIntent>): Intent | undefined {
-    return db.update(intents).set(data).where(eq(intents.id, id)).returning().get();
+  getPendingGovernance(): Governance[] {
+    return db
+      .select()
+      .from(governance)
+      .where(eq(governance.status, "pending"))
+      .orderBy(desc(governance.createdAt))
+      .all();
   }
 
-  // Activity Log
-  getActivity(limit = 100): Activity[] {
-    return db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(limit).all();
+  createGovernance(g: InsertGovernance): Governance {
+    return db.insert(governance).values(g).returning().get();
   }
+
+  updateGovernance(id: number, data: Partial<InsertGovernance>): Governance | undefined {
+    return db.update(governance).set(data).where(eq(governance.id, id)).returning().get();
+  }
+
+  // ─── Cost Events ─────────────────────────────────────────────────────────────
+  getCostEvents(): CostEvent[] {
+    return db.select().from(costEvents).orderBy(desc(costEvents.createdAt)).all();
+  }
+
+  getCostEventsByCapability(capabilityId: number): CostEvent[] {
+    return db
+      .select()
+      .from(costEvents)
+      .where(eq(costEvents.capabilityId, capabilityId))
+      .orderBy(desc(costEvents.createdAt))
+      .all();
+  }
+
+  createCostEvent(e: InsertCostEvent): CostEvent {
+    return db.insert(costEvents).values(e).returning().get();
+  }
+
+  getDailyTotals(days = 30): { day: number; total: number }[] {
+    const rows = db
+      .select({
+        day: costEvents.dayOffset,
+        total: sql<number>`sum(${costEvents.amount})`.as("total"),
+      })
+      .from(costEvents)
+      .groupBy(costEvents.dayOffset)
+      .all();
+
+    const map = new Map<number, number>();
+    for (const row of rows) {
+      map.set(row.day, Number(row.total));
+    }
+    const result: { day: number; total: number }[] = [];
+    for (let d = days - 1; d >= 0; d--) {
+      result.push({ day: d, total: map.get(d) ?? 0 });
+    }
+    return result.sort((a, b) => b.day - a.day);
+  }
+
+  // ─── Activity Log ────────────────────────────────────────────────────────────
+  getActivity(limit = 50): Activity[] {
+    return db
+      .select()
+      .from(activityLog)
+      .orderBy(desc(activityLog.createdAt))
+      .limit(limit)
+      .all();
+  }
+
   createActivity(a: InsertActivity): Activity {
     return db.insert(activityLog).values(a).returning().get();
   }
 
-  // Metrics
-  getLatestMetrics(): Metric[] {
-    // Get latest value for each metric name
-    const subq = db
-      .select({
-        name: metrics.name,
-        maxId: sql<number>`max(${metrics.id})`.as("max_id"),
-      })
-      .from(metrics)
-      .groupBy(metrics.name)
-      .all();
-
-    const ids = subq.map((r) => r.maxId);
-    if (ids.length === 0) return [];
-    
-    return db.select().from(metrics).all().filter(m => ids.includes(m.id));
+  // ─── Migration Map ───────────────────────────────────────────────────────────
+  getMigrations(): Migration[] {
+    return db.select().from(migrationMap).orderBy(migrationMap.id).all();
   }
-  createMetric(m: InsertMetric): Metric {
-    return db.insert(metrics).values(m).returning().get();
+
+  createMigration(m: InsertMigration): Migration {
+    return db.insert(migrationMap).values(m).returning().get();
+  }
+
+  updateMigration(id: number, data: Partial<InsertMigration>): Migration | undefined {
+    return db.update(migrationMap).set(data).where(eq(migrationMap.id, id)).returning().get();
+  }
+
+  // ─── Composition Links ───────────────────────────────────────────────────────
+  getCompositionLinks(): CompositionLink[] {
+    return db.select().from(compositionLinks).orderBy(compositionLinks.id).all();
+  }
+
+  createCompositionLink(l: InsertCompositionLink): CompositionLink {
+    return db.insert(compositionLinks).values(l).returning().get();
+  }
+
+  // ─── Evolution Log ───────────────────────────────────────────────────────────
+  getEvolutionHistory(limit = 20): Evolution[] {
+    return db
+      .select()
+      .from(evolutionLog)
+      .orderBy(desc(evolutionLog.generation))
+      .limit(limit)
+      .all();
+  }
+
+  createEvolution(e: InsertEvolution): Evolution {
+    return db.insert(evolutionLog).values(e).returning().get();
+  }
+
+  // ─── Council Reviews ─────────────────────────────────────────────────────────
+  getCouncilReviews(limit = 20): CouncilReview[] {
+    return db
+      .select()
+      .from(councilReviews)
+      .orderBy(desc(councilReviews.createdAt))
+      .limit(limit)
+      .all();
+  }
+
+  createCouncilReview(r: InsertCouncilReview): CouncilReview {
+    return db.insert(councilReviews).values(r).returning().get();
   }
 }
 

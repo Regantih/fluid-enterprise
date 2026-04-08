@@ -1,14 +1,10 @@
-import { type ReactNode } from "react";
 import { AppSidebar } from "./app-sidebar";
 
-export function Layout({ children }: { children: ReactNode }) {
+export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="h-screen flex" data-testid="app-layout">
+    <div className="grid grid-cols-[260px_1fr] h-[100dvh] overflow-hidden">
       <AppSidebar />
-      <main
-        className="ml-[260px] flex-1 h-screen overflow-y-auto custom-scrollbar bg-background"
-        data-testid="main-content"
-      >
+      <main className="overflow-y-auto custom-scrollbar bg-background">
         {children}
       </main>
     </div>

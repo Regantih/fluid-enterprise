@@ -1,167 +1,130 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Command,
-  Brain,
+  LayoutDashboard,
+  Database,
+  GitBranch,
   Shield,
-  Dna,
-  Lock,
-  Boxes,
-  AlertTriangle,
+  Activity,
+  ArrowRightLeft,
+  DollarSign,
+  ScrollText,
 } from "lucide-react";
 
 const navItems = [
-  { path: "/", label: "Command Center", icon: Command },
-  { path: "/archon", label: "Archon", icon: Brain },
-  { path: "/guilds", label: "Guilds", icon: Shield },
-  { path: "/evolution", label: "Evolution", icon: Dna },
-  { path: "/trust", label: "Trust", icon: Lock },
-  { path: "/skills", label: "Skills", icon: Boxes },
-  { path: "/escalations", label: "Escalations", icon: AlertTriangle },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/registry", label: "Capability Registry", icon: Database },
+  { href: "/composition", label: "Composition Engine", icon: GitBranch },
+  { href: "/governance", label: "Governance Board", icon: Shield },
+  { href: "/heartbeat", label: "Heartbeat Monitor", icon: Activity },
+  { href: "/migration", label: "Migration Planner", icon: ArrowRightLeft },
+  { href: "/costs", label: "Cost Dashboard", icon: DollarSign },
+  { href: "/activity", label: "Activity Log", icon: ScrollText },
 ];
-
-function FluidLogo() {
-  return (
-    <svg
-      width="36"
-      height="36"
-      viewBox="0 0 40 40"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="Fluid Enterprise Logo"
-    >
-      {/* Hexagonal shell */}
-      <path
-        d="M20 2L36.66 11.5V30.5L20 40L3.34 30.5V11.5L20 2Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-        opacity="0.6"
-      />
-      {/* Inner hexagon */}
-      <path
-        d="M20 9L30.39 14.5V25.5L20 31L9.61 25.5V14.5L20 9Z"
-        stroke="currentColor"
-        strokeWidth="1"
-        strokeLinejoin="round"
-        opacity="0.3"
-      />
-      {/* Central node */}
-      <circle cx="20" cy="20" r="2.5" fill="currentColor" opacity="0.9" />
-      {/* Network nodes */}
-      <circle cx="20" cy="9" r="1.5" fill="currentColor" opacity="0.7" />
-      <circle cx="29" cy="14.5" r="1.5" fill="currentColor" opacity="0.7" />
-      <circle cx="29" cy="25.5" r="1.5" fill="currentColor" opacity="0.7" />
-      <circle cx="20" cy="31" r="1.5" fill="currentColor" opacity="0.7" />
-      <circle cx="11" cy="25.5" r="1.5" fill="currentColor" opacity="0.7" />
-      <circle cx="11" cy="14.5" r="1.5" fill="currentColor" opacity="0.7" />
-      {/* Connection lines from center to nodes */}
-      <line x1="20" y1="20" x2="20" y2="9" stroke="currentColor" strokeWidth="0.75" opacity="0.4" />
-      <line x1="20" y1="20" x2="29" y2="14.5" stroke="currentColor" strokeWidth="0.75" opacity="0.4" />
-      <line x1="20" y1="20" x2="29" y2="25.5" stroke="currentColor" strokeWidth="0.75" opacity="0.4" />
-      <line x1="20" y1="20" x2="20" y2="31" stroke="currentColor" strokeWidth="0.75" opacity="0.4" />
-      <line x1="20" y1="20" x2="11" y2="25.5" stroke="currentColor" strokeWidth="0.75" opacity="0.4" />
-      <line x1="20" y1="20" x2="11" y2="14.5" stroke="currentColor" strokeWidth="0.75" opacity="0.4" />
-      {/* Cross connections */}
-      <line x1="20" y1="9" x2="29" y2="14.5" stroke="currentColor" strokeWidth="0.5" opacity="0.25" />
-      <line x1="29" y1="14.5" x2="29" y2="25.5" stroke="currentColor" strokeWidth="0.5" opacity="0.25" />
-      <line x1="29" y1="25.5" x2="20" y2="31" stroke="currentColor" strokeWidth="0.5" opacity="0.25" />
-      <line x1="20" y1="31" x2="11" y2="25.5" stroke="currentColor" strokeWidth="0.5" opacity="0.25" />
-      <line x1="11" y1="25.5" x2="11" y2="14.5" stroke="currentColor" strokeWidth="0.5" opacity="0.25" />
-      <line x1="11" y1="14.5" x2="20" y2="9" stroke="currentColor" strokeWidth="0.5" opacity="0.25" />
-    </svg>
-  );
-}
 
 export function AppSidebar() {
   const [location] = useLocation();
 
   const { data: dashboard } = useQuery<any>({
     queryKey: ["/api/dashboard"],
-    refetchInterval: 5000,
+    refetchInterval: 10000,
   });
 
-  const currentGeneration = dashboard?.latestEvolution?.generationNumber ?? "—";
+  const generation = dashboard?.kpis?.evolutionGeneration ?? 0;
+  const fitness = dashboard?.kpis?.systemFitness ?? 0;
 
   return (
-    <div
-      className="fixed left-0 top-0 h-screen w-[260px] flex flex-col bg-sidebar border-r border-sidebar-border z-50"
+    <aside
+      className="w-[260px] min-w-[260px] h-full flex flex-col bg-[hsl(228,28%,7%)] border-r border-[hsl(225,20%,12%)]"
       data-testid="app-sidebar"
     >
-      {/* Logo area */}
-      <div className="px-5 pt-6 pb-5">
+      {/* Logo */}
+      <div className="px-5 pt-5 pb-4 border-b border-[hsl(225,20%,12%)]">
         <div className="flex items-center gap-3">
-          <div className="text-cyan-400">
-            <FluidLogo />
-          </div>
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 36 36"
+            fill="none"
+            aria-label="Fluid Enterprise logo"
+          >
+            {/* Hexagonal outer */}
+            <path
+              d="M18 2L32 10V26L18 34L4 26V10L18 2Z"
+              stroke="hsl(187,85%,48%)"
+              strokeWidth="1.5"
+              fill="none"
+            />
+            {/* Inner connected nodes */}
+            <circle cx="18" cy="10" r="2" fill="hsl(187,85%,48%)" />
+            <circle cx="10" cy="22" r="2" fill="hsl(187,85%,48%)" />
+            <circle cx="26" cy="22" r="2" fill="hsl(187,85%,48%)" />
+            <circle cx="18" cy="18" r="2.5" fill="hsl(160,60%,45%)" />
+            {/* Connections */}
+            <line x1="18" y1="10" x2="18" y2="18" stroke="hsl(187,85%,48%)" strokeWidth="1" opacity="0.6" />
+            <line x1="10" y1="22" x2="18" y2="18" stroke="hsl(187,85%,48%)" strokeWidth="1" opacity="0.6" />
+            <line x1="26" y1="22" x2="18" y2="18" stroke="hsl(187,85%,48%)" strokeWidth="1" opacity="0.6" />
+            <line x1="18" y1="10" x2="10" y2="22" stroke="hsl(187,85%,48%)" strokeWidth="0.5" opacity="0.3" />
+            <line x1="18" y1="10" x2="26" y2="22" stroke="hsl(187,85%,48%)" strokeWidth="0.5" opacity="0.3" />
+            <line x1="10" y1="22" x2="26" y2="22" stroke="hsl(187,85%,48%)" strokeWidth="0.5" opacity="0.3" />
+          </svg>
           <div>
-            <h1 className="text-[13px] font-semibold tracking-[0.08em] text-sidebar-foreground uppercase">
-              Fluid Enterprise
-            </h1>
-            <p className="text-[10px] tracking-[0.04em] text-muted-foreground mt-0.5">
-              Agent-First ERP
-            </p>
+            <div className="text-xs font-bold tracking-[0.15em] text-cyan-400">
+              FLUID ENTERPRISE
+            </div>
+            <div className="text-[10px] text-slate-500 tracking-wide">
+              Self-Evolving Platform
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Separator */}
-      <div className="mx-4 h-px bg-sidebar-border" />
-
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto custom-scrollbar" data-testid="sidebar-nav">
+      <nav className="flex-1 py-3 px-2 overflow-y-auto custom-scrollbar">
         {navItems.map((item) => {
           const isActive =
-            item.path === "/"
-              ? location === "/" || location === ""
-              : location.startsWith(item.path);
+            item.href === "/"
+              ? location === "/"
+              : location.startsWith(item.href);
+          const Icon = item.icon;
 
           return (
-            <Link key={item.path} href={item.path}>
+            <Link key={item.href} href={item.href}>
               <div
-                className={`
-                  flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium cursor-pointer transition-colors duration-150
-                  ${
-                    isActive
-                      ? "bg-sidebar-accent text-cyan-400 border-l-2 border-cyan-400 -ml-[2px] pl-[14px]"
-                      : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  }
-                `}
-                data-testid={`nav-${item.path === "/" ? "command-center" : item.path.slice(1)}`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm cursor-pointer transition-all mb-0.5 ${
+                  isActive
+                    ? "bg-cyan-500/10 text-cyan-400 border-l-2 border-cyan-400 pl-[10px]"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border-l-2 border-transparent pl-[10px]"
+                }`}
+                data-testid={`nav-${item.href.replace("/", "") || "dashboard"}`}
               >
-                <item.icon className="w-4 h-4 shrink-0" />
+                <Icon className="w-4 h-4 shrink-0" />
                 <span>{item.label}</span>
-                {item.path === "/escalations" && dashboard?.pendingEscalations > 0 && (
-                  <span className="ml-auto text-[10px] font-mono bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full tabular-nums">
-                    {dashboard.pendingEscalations}
-                  </span>
-                )}
               </div>
             </Link>
           );
         })}
       </nav>
 
-      {/* Separator */}
-      <div className="mx-4 h-px bg-sidebar-border" />
-
-      {/* System status */}
-      <div className="px-5 py-4" data-testid="system-status">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 pulse-live" />
-          <span className="text-[11px] text-sidebar-foreground/70 font-medium">
-            System Online
+      {/* Bottom: Evolution Indicator */}
+      <div className="px-4 py-4 border-t border-[hsl(225,20%,12%)]">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-2 h-2 rounded-full bg-cyan-400 pulse-live" />
+          <span className="text-xs font-mono font-bold text-cyan-400 tracking-wide" data-testid="sidebar-generation">
+            GENERATION {generation}
           </span>
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            Generation
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[10px] text-slate-500">FITNESS</span>
+          <span className="text-xs font-mono text-cyan-400 tabular-nums" data-testid="sidebar-fitness">
+            {fitness.toFixed(3)}
           </span>
-          <span className="text-[11px] font-mono tabular-nums text-cyan-400" data-testid="generation-number">
-            {currentGeneration}
-          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <span className="text-[10px] text-emerald-400">System Online</span>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }
