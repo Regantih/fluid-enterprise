@@ -3,6 +3,8 @@
 > **The first self-evolving enterprise platform.** Built on the principles of AlphaGo → AlphaZero → AlphaEvolve.
 > 
 > Agents run the enterprise. Humans govern intent. The system evolves every generation.
+>
+> This is an original architecture. Not a fork. Not inspired by another project. Built from first principles by Hemanth Raganti.
 
 ---
 
