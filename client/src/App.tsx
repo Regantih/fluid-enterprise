@@ -13,6 +13,7 @@ import HeartbeatMonitor from "@/pages/heartbeat-monitor";
 import MigrationPlanner from "@/pages/migration-planner";
 import CostDashboard from "@/pages/cost-dashboard";
 import ActivityLog from "@/pages/activity-log";
+import AgentWorkbench from "@/pages/agent-workbench";
 import NotFound from "@/pages/not-found";
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
       <Router hook={useHashLocation}>
         <Layout>
           <Switch>
+            <Route path="/agent-workbench" component={AgentWorkbench} />
             <Route path="/" component={Dashboard} />
             <Route path="/registry" component={CapabilityRegistry} />
             <Route path="/composition" component={CompositionEngine} />

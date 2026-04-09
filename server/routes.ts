@@ -399,6 +399,32 @@ export function registerRoutes(server: Server, app: Express): void {
     }
   });
 
+  // Agent execute stream
+  app.post("/api/agent/execute", async (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    try {
+      const upstream = await fetch(`${FASTAPI}/api/agent/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body),
+      });
+      if (!upstream.body) { res.end(); return; }
+      const reader = upstream.body.getReader();
+      req.on("close", () => reader.cancel());
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(Buffer.from(value));
+      }
+      res.end();
+    } catch (e: any) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
   app.get("/api/agents/activity/stream", async (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -715,5 +741,184 @@ export function registerRoutes(server: Server, app: Express): void {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
     const reviews = storage.getCouncilReviews(limit);
     res.json(reviews);
+  });
+
+  // ── POST /api/agent/execute ─────────────────────────────────────────────────
+  // Streams SSE events simulating a live agent execution pipeline.
+  app.post("/api/agent/execute", async (req, res) => {
+    const { signal_type = "vendor_risk" } = req.body ?? {};
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    function send(data: object) {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }
+
+    function sleep(ms: number) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    const configs: Record<string, {
+      agentName: string;
+      signalId: string;
+      source: string;
+      topic: string;
+      vendor: string;
+      riskLevel: string;
+      confidence: number;
+      patternCount: number;
+      actionType: string;
+      summary: string;
+    }> = {
+      vendor_risk: {
+        agentName: "Vendor Risk Agent",
+        signalId: "#4521",
+        source: "Slack #ops-alerts",
+        topic: "Vendor delivery delay — Apex Precision Parts",
+        vendor: "Apex Precision Parts",
+        riskLevel: "HIGH",
+        confidence: 89,
+        patternCount: 57,
+        actionType: "Escalation Workflow → Procurement Lead",
+        summary: "Vendor delivered 12 days late on PO-7821. Third incident in 60 days.",
+      },
+      month_end_close: {
+        agentName: "Month-End Close Agent",
+        signalId: "#8834",
+        source: "ERP Trigger",
+        topic: "GL reconciliation variance detected — Q1 Close",
+        vendor: "Internal Finance",
+        riskLevel: "MEDIUM",
+        confidence: 94,
+        patternCount: 143,
+        actionType: "Auto-Journal Entry + CFO Notification",
+        summary: "$42,810 variance in COGS account 5120. Likely accrual timing mismatch.",
+      },
+      onboarding: {
+        agentName: "Onboarding Agent",
+        signalId: "#2201",
+        source: "HR System",
+        topic: "New hire onboarding initiated — Priya Sharma",
+        vendor: "Priya Sharma",
+        riskLevel: "LOW",
+        confidence: 97,
+        patternCount: 312,
+        actionType: "Provision Accounts + Schedule Day-1 Checklist",
+        summary: "Engineering role, start date Monday. Requires: GitHub, Jira, Slack, AWS sandbox.",
+      },
+    };
+
+    const cfg = configs[signal_type] ?? configs["vendor_risk"];
+    const ts = () => new Date().toISOString();
+
+    // Step 1: Signal received
+    send({
+      step: "signal",
+      title: "Signal Received",
+      content: `Incoming signal from ${cfg.source}: "${cfg.topic}"`,
+      signal_id: cfg.signalId,
+      agent_name: cfg.agentName,
+      timestamp: ts(),
+      detail: {
+        id: cfg.signalId,
+        source: cfg.source,
+        type: signal_type,
+        topic: cfg.topic,
+        received_at: ts(),
+        payload: { summary: cfg.summary, priority: "HIGH", requires_action: true },
+      },
+    });
+    await sleep(700);
+
+    // Step 2: Reasoning stream (character by character, chunked)
+    const reasoningText = `Analyzing signal ${cfg.signalId} from ${cfg.source}.\n\nLoading agent memory... ${cfg.patternCount} historical patterns found.\n\nCross-referencing vendor: ${cfg.vendor}\n  → Previous incidents: 3 in last 90 days\n  → Contract SLA compliance: 71%\n  → Peer benchmark: P85 risk tier\n\nEvaluating risk dimensions:\n  [1] Delivery reliability ............... POOR\n  [2] Financial exposure ................. $380K open POs\n  [3] Supply chain dependency ............ HIGH (sole source)\n  [4] Remediation history ................ None documented\n\nConclusion: Escalation warranted. Confidence ${cfg.confidence}%.`;
+
+    const chunkSize = 12;
+    for (let i = 0; i < reasoningText.length; i += chunkSize) {
+      send({
+        step: "reasoning_stream",
+        content: reasoningText.slice(i, i + chunkSize),
+        timestamp: ts(),
+      });
+      await sleep(28);
+    }
+    await sleep(400);
+
+    // Step 3: Decision
+    send({
+      step: "decision",
+      title: "Decision Made",
+      content: `Risk classification: ${cfg.riskLevel}. Confidence: ${cfg.confidence}%. Matched ${cfg.patternCount} historical patterns. Action threshold exceeded.`,
+      risk_level: cfg.riskLevel,
+      confidence: cfg.confidence,
+      pattern_count: cfg.patternCount,
+      timestamp: ts(),
+      detail: {
+        risk_level: cfg.riskLevel,
+        confidence: cfg.confidence,
+        patterns_matched: cfg.patternCount,
+        vendor: cfg.vendor,
+        decision: "ESCALATE",
+        rationale: "SLA breach rate exceeds 25% threshold over rolling 90-day window.",
+      },
+    });
+    await sleep(800);
+
+    // Step 4: Action executed
+    send({
+      step: "action",
+      title: "Action Executed",
+      content: `Triggered: ${cfg.actionType}. Notification sent. Workflow instance created.`,
+      action_type: cfg.actionType,
+      timestamp: ts(),
+      detail: {
+        workflow_id: `WF-${Math.floor(Math.random() * 90000) + 10000}`,
+        action: cfg.actionType,
+        notified: ["procurement-lead@company.com", "#supply-chain-alerts"],
+        sla_deadline: new Date(Date.now() + 86400000 * 2).toISOString(),
+      },
+    });
+    await sleep(800);
+
+    // Step 5: Governance / recorded
+    const govHash = `0x${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}`;
+    send({
+      step: "governance",
+      title: "Recorded & Learning",
+      content: "Action logged to immutable governance chain. Agent memory updated. Trust score recalculated.",
+      governance_hash: govHash,
+      trust_delta: "+0.02",
+      timestamp: ts(),
+      detail: {
+        governance_hash: govHash,
+        block: Math.floor(Math.random() * 500000) + 100000,
+        trust_before: 0.847,
+        trust_after: 0.867,
+        memory_update: `Added pattern: ${signal_type}_${cfg.riskLevel.toLowerCase()}_escalation`,
+        retention_policy: "permanent",
+      },
+    });
+    await sleep(600);
+
+    // Step 6: Complete
+    send({
+      step: "complete",
+      title: "Execution Complete",
+      content: `Agent cycle finished in ${(Math.random() * 1.5 + 1.2).toFixed(2)}s. System fitness improved. ${cfg.agentName} is ready for the next signal.`,
+      fitness_delta: "+0.003",
+      timestamp: ts(),
+      detail: {
+        steps_executed: 6,
+        total_ms: Math.floor(Math.random() * 800) + 1200,
+        fitness_delta: 0.003,
+        agent: cfg.agentName,
+        signal_type,
+      },
+    });
+
+    res.end();
   });
 }

@@ -10,9 +10,11 @@ import {
   ArrowRightLeft,
   DollarSign,
   ScrollText,
+  PlayCircle,
 } from "lucide-react";
 
 const navItems = [
+  { href: "/agent-workbench", label: "Agent Workbench", icon: PlayCircle },
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/registry", label: "Capability Registry", icon: Database },
   { href: "/composition", label: "Composition Engine", icon: GitBranch },
