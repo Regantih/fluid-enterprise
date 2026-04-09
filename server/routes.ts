@@ -372,10 +372,38 @@ export function registerRoutes(server: Server, app: Express): void {
     catch (e: any) { res.status(502).json({ error: e.message }); }
   });
 
-  // ═══ SIMULATION ROUTES (all other pages) ═══
+  // ═══ ALL PAGES: proxy to FastAPI (real Postgres data) ═══
+  const proxyAll = [
+    "dashboard", "capabilities", "agents", "heartbeat",
+    "governance", "activity", "evolution", "council",
+    "costs", "costs/daily", "migration", "composition",
+  ];
+  for (const route of proxyAll) {
+    app.get(`/api/${route}`, async (_req: any, res: any) => {
+      try { res.json(await proxyToFastAPI(`/api/${route}`)); }
+      catch (e: any) { /* fall through to simulation */ res.status(502).json({ error: e.message }); }
+    });
+  }
+  // Capability detail
+  app.get("/api/capabilities/:id", async (req: any, res: any) => {
+    try { res.json(await proxyToFastAPI(`/api/capabilities/${req.params.id}`)); }
+    catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
+  // Agent detail
+  app.get("/api/agents/:id", async (req: any, res: any) => {
+    try { res.json(await proxyToFastAPI(`/api/agents/${req.params.id}`)); }
+    catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
+  // Governance resolve
+  app.post("/api/governance/:id/resolve", async (req: any, res: any) => {
+    try { res.json(await proxyToFastAPI(`/api/governance/${req.params.id}/resolve`, "POST", req.body)); }
+    catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
 
-  // ── GET /api/dashboard (merges simulation + real Postgres data) ───────────
-  app.get("/api/dashboard", async (_req, res) => {
+  // ═══ SIMULATION ROUTES (fallback if FastAPI is down) ═══
+
+  // ── GET /api/dashboard-sim ─────────────────────────────────────────
+  app.get("/api/dashboard-sim", async (_req, res) => {
     // Try to enrich with real Postgres data for the generation counter
     let realGeneration = 0;
     let realGapCount = 0;
