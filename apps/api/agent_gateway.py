@@ -21,6 +21,7 @@ Interaction Types:
 import json
 import hashlib
 import logging
+import os
 import random
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -30,7 +31,7 @@ import psycopg2.extras
 
 logger = logging.getLogger("agent_gateway")
 
-DATABASE_URL = "postgresql://fluid:fluid_dev_2026@localhost:5432/fluid_enterprise"
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://fluid:fluid_dev_2026@localhost:5432/fluid_enterprise")
 
 GOVERNANCE_THRESHOLD_USD = 50000  # interactions above this require governance
 

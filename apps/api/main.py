@@ -20,20 +20,30 @@ from typing import Any, Optional
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 import redis
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://fluid:fluid_dev_2026@localhost:5432/fluid_enterprise")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
+_db_pool = psycopg2.pool.ThreadedConnectionPool(2, 10, DATABASE_URL)
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("fluid_api")
 
+FLUID_API_KEY = os.environ.get("FLUID_API_KEY", "fluid-demo-2026")
+
+
+def verify_api_key(x_api_key: str = Header(...)):
+    if x_api_key != FLUID_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+
 
 def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = _db_pool.getconn()
     conn.autocommit = True
     psycopg2.extras.register_uuid()
     return conn
@@ -592,7 +602,7 @@ async def lifespan(app: FastAPI):
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM tenants")
         logger.info(f"DB connected. {cur.fetchone()[0]} tenant(s).")
-        conn.close()
+        _db_pool.putconn(conn)
     except Exception as e:
         logger.error(f"DB fail: {e}")
     try:
@@ -615,7 +625,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Fluid Enterprise API", version="0.1.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5000", "http://localhost:5173", "http://localhost:3000"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 
 # ═══ HEALTH ═══
@@ -623,7 +633,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 def health():
     checks = {"api": "ok", "database": "unknown", "redis": "unknown"}
     try:
-        conn = get_db(); cur = conn.cursor(); cur.execute("SELECT 1"); checks["database"] = "ok"; conn.close()
+        conn = get_db(); cur = conn.cursor(); cur.execute("SELECT 1"); checks["database"] = "ok"; _db_pool.putconn(conn)
     except Exception as e:
         checks["database"] = f"error: {e}"
     try:
@@ -649,7 +659,7 @@ def frontend_dashboard():
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return _empty_dashboard()
 
     # ── Capabilities ──────────────────────────────────────────────────────────
@@ -717,7 +727,7 @@ def frontend_dashboard():
     evolution_list = _build_evolution_from_fitness(cur, tid, limit=1)
     latest_evolution = evolution_list[0] if evolution_list else None
 
-    conn.close()
+    _db_pool.putconn(conn)
     return {
         "capabilities": caps,
         "agentSummary": agent_summary,
@@ -751,10 +761,10 @@ def frontend_list_capabilities():
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
     caps = _build_capabilities_with_fitness(cur, tid)
-    conn.close()
+    _db_pool.putconn(conn)
     return caps
 
 
@@ -768,7 +778,7 @@ def frontend_get_capability(cap_id: str):
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         raise HTTPException(404, "No tenant found")
 
     # Determine if cap_id is UUID or synthetic int
@@ -789,7 +799,7 @@ def frontend_get_capability(cap_id: str):
                 break
 
     if not row:
-        conn.close()
+        _db_pool.putconn(conn)
         raise HTTPException(404, "Capability not found")
 
     # Fitness history
@@ -821,7 +831,7 @@ def frontend_get_capability(cap_id: str):
     # Build synthetic tasks
     tasks = _build_synthetic_tasks(frontend_cap)
 
-    conn.close()
+    _db_pool.putconn(conn)
     return {
         **frontend_cap,
         "agents": agents,
@@ -874,10 +884,10 @@ def frontend_list_agents():
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
     caps = _build_capabilities_with_fitness(cur, tid)
-    conn.close()
+    _db_pool.putconn(conn)
     return _build_synthetic_agents(caps)
 
 
@@ -888,10 +898,10 @@ def frontend_get_agent(agent_id: int):
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         raise HTTPException(404, "No tenant found")
     caps = _build_capabilities_with_fitness(cur, tid)
-    conn.close()
+    _db_pool.putconn(conn)
     agents = _build_synthetic_agents(caps)
     for agent in agents:
         if agent["id"] == agent_id:
@@ -940,10 +950,10 @@ def frontend_heartbeat():
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
     caps = _build_capabilities_with_fitness(cur, tid)
-    conn.close()
+    _db_pool.putconn(conn)
     return _build_synthetic_agents(caps)
 
 
@@ -954,7 +964,7 @@ def frontend_list_governance(limit: int = 50):
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
 
     # Real governance events from Postgres
@@ -1006,7 +1016,7 @@ def frontend_list_governance(limit: int = 50):
             s["id"] = s["id"] + 100000
         result.extend(synthetic)
 
-    conn.close()
+    _db_pool.putconn(conn)
     return result[:limit]
 
 
@@ -1022,8 +1032,32 @@ def frontend_resolve_governance(gov_id: int, body: GovernanceResolveBody):
     if body.status not in ("approved", "rejected", "deferred"):
         raise HTTPException(400, "status must be approved, rejected, or deferred")
 
-    # For synthetic ids (> 100000), just return a success stub
+    # For synthetic ids (> 100000), write a real governance event so it persists
     if gov_id > 100000:
+        conn = get_db()
+        cur = _dict_cur(conn)
+        decision_map = {"approved": "approve", "rejected": "veto", "deferred": "propose"}
+        new_decision = decision_map.get(body.status, "propose")
+        actor = body.reviewedBy or "human-reviewer"
+        try:
+            tid = _get_default_tenant_id(cur)
+            cur.execute("SELECT this_hash FROM governance_events WHERE tenant_id = %s ORDER BY id DESC LIMIT 1", (tid,))
+            prev = cur.fetchone()
+            prev_hash = prev["this_hash"] if prev else ""
+            payload = json.dumps({
+                "gov_id": gov_id, "decision": new_decision, "actor": actor,
+                "prev": prev_hash, "ts": datetime.now(timezone.utc).isoformat()
+            }, sort_keys=True)
+            this_hash = hashlib.sha256(payload.encode()).hexdigest()
+            cur.execute("""
+                INSERT INTO governance_events
+                    (tenant_id, capability_id, from_stage, to_stage, decision, actor, rationale, prev_hash, this_hash)
+                VALUES (%s, NULL, NULL, NULL, %s, %s, %s, %s, %s)
+            """, (tid, new_decision, actor, body.response or "", prev_hash, this_hash))
+            _db_pool.putconn(conn)
+        except Exception as e:
+            _db_pool.putconn(conn)
+            raise HTTPException(500, f"Failed to persist synthetic governance resolution: {e}")
         return {
             "id": gov_id,
             "status": body.status,
@@ -1060,7 +1094,7 @@ def frontend_resolve_governance(gov_id: int, body: GovernanceResolveBody):
             RETURNING *
         """, (new_decision, actor, body.response or "", prev_hash, this_hash, gov_id))
         new_row = cur.fetchone()
-        conn.close()
+        _db_pool.putconn(conn)
 
         if not new_row:
             raise HTTPException(404, "Governance item not found")
@@ -1075,7 +1109,7 @@ def frontend_resolve_governance(gov_id: int, body: GovernanceResolveBody):
     except HTTPException:
         raise
     except Exception as e:
-        conn.close()
+        _db_pool.putconn(conn)
         raise HTTPException(500, f"Failed to resolve governance: {e}")
 
 
@@ -1086,10 +1120,10 @@ def frontend_activity(limit: int = Query(50, le=200)):
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
     activities = _build_activity_from_signals(cur, tid, limit=limit)
-    conn.close()
+    _db_pool.putconn(conn)
     return activities
 
 
@@ -1100,10 +1134,10 @@ def frontend_evolution(limit: int = Query(20, le=100)):
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
     result = _build_evolution_from_fitness(cur, tid, limit=limit)
-    conn.close()
+    _db_pool.putconn(conn)
     return result
 
 
@@ -1114,10 +1148,10 @@ def frontend_council(limit: int = Query(20, le=100)):
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
     result = _build_council_from_governance(cur, tid, limit=limit)
-    conn.close()
+    _db_pool.putconn(conn)
     return result
 
 
@@ -1128,10 +1162,10 @@ def frontend_costs(limit: int = Query(100, le=500)):
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
     caps = _build_capabilities_with_fitness(cur, tid)
-    conn.close()
+    _db_pool.putconn(conn)
 
     EVENT_TYPES = ["compute", "api_call", "data_transfer", "storage"]
     DESCRIPTIONS = {
@@ -1181,10 +1215,10 @@ def frontend_costs_daily(days: int = Query(30, le=365)):
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
     caps = _build_capabilities_with_fitness(cur, tid)
-    conn.close()
+    _db_pool.putconn(conn)
     return _build_cost_trend(caps, days=days)
 
 
@@ -1195,10 +1229,10 @@ def frontend_migration():
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
     caps = _build_capabilities_with_fitness(cur, tid)
-    conn.close()
+    _db_pool.putconn(conn)
     return _build_synthetic_migration(caps)
 
 
@@ -1209,10 +1243,10 @@ def frontend_composition():
     cur = _dict_cur(conn)
     tid = _get_default_tenant_id(cur)
     if not tid:
-        conn.close()
+        _db_pool.putconn(conn)
         return []
     caps = _build_capabilities_with_fitness(cur, tid)
-    conn.close()
+    _db_pool.putconn(conn)
     return _build_synthetic_composition(caps)
 
 
@@ -1225,7 +1259,7 @@ def frontend_composition():
 def get_tenant(slug: str):
     conn = get_db(); cur = _dict_cur(conn)
     cur.execute("SELECT * FROM tenants WHERE slug = %s", (slug,))
-    row = cur.fetchone(); conn.close()
+    row = cur.fetchone(); _db_pool.putconn(conn)
     if not row: raise HTTPException(404, "Not found")
     return _ser(row)
 
@@ -1238,7 +1272,7 @@ def list_capabilities(slug: str, stage: Optional[str] = None):
     p: list = [tid]
     if stage: q += " AND c.stage=%s"; p.append(stage)
     q += " ORDER BY c.generation DESC, c.created_at DESC"
-    cur.execute(q, p); rows = cur.fetchall(); conn.close()
+    cur.execute(q, p); rows = cur.fetchall(); _db_pool.putconn(conn)
     return [_ser(r) for r in rows]
 
 
@@ -1247,14 +1281,14 @@ def get_capability(slug: str, cap_id: str):
     conn = get_db(); cur = _dict_cur(conn)
     cur.execute("SELECT * FROM capabilities WHERE id=%s", (cap_id,))
     row = cur.fetchone()
-    if not row: conn.close(); raise HTTPException(404, "Not found")
+    if not row: _db_pool.putconn(conn); raise HTTPException(404, "Not found")
     # Get fitness history
     cur.execute("SELECT * FROM fitness_scores WHERE capability_id=%s ORDER BY evaluated_at DESC LIMIT 20", (cap_id,))
     fitness = cur.fetchall()
     # Get governance events
     cur.execute("SELECT * FROM governance_events WHERE capability_id=%s ORDER BY created_at DESC LIMIT 20", (cap_id,))
     gov = cur.fetchall()
-    conn.close()
+    _db_pool.putconn(conn)
     return {**_ser(row), "fitness_history": [_ser(f) for f in fitness], "governance_history": [_ser(g) for g in gov]}
 
 
@@ -1273,7 +1307,7 @@ def create_capability(slug: str, body: CapabilityCreate):
         (tid, body.name, body.slug, body.kind, body.stage, body.generation,
          body.parent_id, json.dumps(body.manifest), body.code, body.eval_suite,
          body.budget_monthly_usd, body.created_by))
-    row = cur.fetchone(); conn.close()
+    row = cur.fetchone(); _db_pool.putconn(conn)
     return _ser(row)
 
 
@@ -1285,7 +1319,7 @@ def list_fitness(slug: str, capability_id: Optional[str] = None, limit: int = 50
     p: list = [slug]
     if capability_id: q += " AND f.capability_id=%s"; p.append(capability_id)
     q += " ORDER BY f.evaluated_at DESC LIMIT %s"; p.append(limit)
-    cur.execute(q, p); rows = cur.fetchall(); conn.close()
+    cur.execute(q, p); rows = cur.fetchall(); _db_pool.putconn(conn)
     return [_ser(r) for r in rows]
 
 
@@ -1294,7 +1328,7 @@ def list_fitness(slug: str, capability_id: Optional[str] = None, limit: int = 50
 def list_governance(slug: str, limit: int = 50):
     conn = get_db(); cur = _dict_cur(conn); tid = _tenant_id(cur, slug)
     cur.execute("SELECT * FROM governance_events WHERE tenant_id=%s ORDER BY created_at DESC LIMIT %s", (tid, limit))
-    rows = cur.fetchall(); conn.close()
+    rows = cur.fetchall(); _db_pool.putconn(conn)
     return [_ser(r) for r in rows]
 
 
@@ -1319,10 +1353,12 @@ def create_governance(slug: str, body: GovernanceCreate):
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
         (tid, body.capability_id, body.from_stage, body.to_stage, body.decision,
          body.actor, body.rationale, prev_hash, this_hash))
-    row = cur.fetchone(); conn.close()
+    row = cur.fetchone(); _db_pool.putconn(conn)
     # Publish to Redis
-    try: get_redis().xadd("governance_stream", {"data": json.dumps(_ser(row))})
-    except: pass
+    try:
+        get_redis().xadd("governance_stream", {"data": json.dumps(_ser(row))})
+    except Exception:
+        logger.exception("Failed to publish governance event to Redis stream")
     return _ser(row)
 
 
@@ -1338,7 +1374,7 @@ def list_signals(slug: str, source: Optional[str] = None, kind: Optional[str] = 
     q += " ORDER BY ingested_at DESC LIMIT %s OFFSET %s"; p.extend([limit, offset])
     cur.execute(q, p); rows = cur.fetchall()
     cur.execute("SELECT COUNT(*) FROM signals WHERE tenant_id=%s", (tid,))
-    total = cur.fetchone()["count"]; conn.close()
+    total = cur.fetchone()["count"]; _db_pool.putconn(conn)
     page = offset // limit + 1
     return {"items": [_ser(r) for r in rows], "total": total, "page": page, "page_size": limit}
 
@@ -1347,7 +1383,7 @@ def list_signals(slug: str, source: Optional[str] = None, kind: Optional[str] = 
 def get_signal(slug: str, sig_id: int):
     conn = get_db(); cur = _dict_cur(conn)
     cur.execute("SELECT id,source,kind,payload,clustered_into,ingested_at FROM signals WHERE id=%s", (sig_id,))
-    row = cur.fetchone(); conn.close()
+    row = cur.fetchone(); _db_pool.putconn(conn)
     if not row: raise HTTPException(404, "Not found")
     return _ser(row)
 
@@ -1360,13 +1396,50 @@ def list_gaps(slug: str, status: Optional[str] = None):
     p: list = [tid]
     if status: q += " AND status=%s"; p.append(status)
     q += " ORDER BY expected_fitness_impact DESC NULLS LAST"
-    cur.execute(q, p); rows = cur.fetchall(); conn.close()
+    cur.execute(q, p); rows = cur.fetchall(); _db_pool.putconn(conn)
     return [_ser(r) for r in rows]
+
+
+# ═══ CONVENIENCE ROUTES (default tenant: acme_robotics) ═══
+DEFAULT_TENANT = "acme_robotics"
+
+@app.get("/api/gaps")
+def list_gaps_default(status: Optional[str] = None):
+    return list_gaps(DEFAULT_TENANT, status)
+
+@app.get("/api/gaps/{gap_id}/signals")
+def list_signals_for_gap(gap_id: str):
+    conn = get_db(); cur = _dict_cur(conn)
+    # First get the evidence_signal_ids from the gap
+    cur.execute("SELECT evidence_signal_ids FROM capability_gaps WHERE id=%s", (gap_id,))
+    gap_row = cur.fetchone()
+    if not gap_row or not gap_row.get('evidence_signal_ids'):
+        _db_pool.putconn(conn)
+        return []
+    sig_ids = gap_row['evidence_signal_ids']
+    cur.execute(
+        "SELECT id,source,kind,payload,clustered_into,ingested_at FROM signals WHERE id = ANY(%s) ORDER BY id",
+        (sig_ids,)
+    )
+    rows = cur.fetchall(); _db_pool.putconn(conn)
+    return [_ser(r) for r in rows]
+
+@app.post("/api/generator/generate")
+def generate_from_gap_default(body: dict):
+    return generate_from_gap(DEFAULT_TENANT, body)
+
+@app.post("/api/arena/evaluate/{cap_id}")
+def evaluate_capability_default(cap_id: str):
+    return evaluate_capability(DEFAULT_TENANT, cap_id)
+
+@app.post("/api/real/capabilities/{cap_id}/transition")
+def transition_capability_default(cap_id: str, body: dict):
+    return transition_capability(DEFAULT_TENANT, cap_id, body)
 
 
 # ═══ REFLECTION LOOP ═══
 @app.post("/api/reflection/run")
-def run_reflection():
+def run_reflection(api_key: str = Depends(verify_api_key)):
     import sys, os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     from apps.api.reflection import run_reflection_loop
@@ -1405,7 +1478,7 @@ def evaluate_capability(slug: str, cap_id: str):
     cur.execute("SELECT * FROM capabilities WHERE id = %s", (cap_id,))
     cap = cur.fetchone()
     if not cap:
-        conn.close(); raise HTTPException(404, "Capability not found")
+        _db_pool.putconn(conn); raise HTTPException(404, "Capability not found")
 
     # Write code to temp file and run eval
     import tempfile
@@ -1415,7 +1488,7 @@ def evaluate_capability(slug: str, cap_id: str):
     eval_path = skills_dir / "eval.jsonl"
 
     if not code_path.exists():
-        conn.close()
+        _db_pool.putconn(conn)
         return {"error": "No capability code on disk", "slug": cap["slug"]}
 
     manifest = CapabilityManifest(
@@ -1424,7 +1497,7 @@ def evaluate_capability(slug: str, cap_id: str):
     )
 
     if not eval_path.exists():
-        conn.close()
+        _db_pool.putconn(conn)
         return {"error": "No eval suite on disk"}
 
     results = SandboxRunner.run_eval(manifest, str(eval_path))
@@ -1447,7 +1520,7 @@ def evaluate_capability(slug: str, cap_id: str):
         (cap_id, cap["generation"], round(success_rate, 4), int(avg_latency),
          round(cost_per_run, 4), round(trust_delta, 4), 0.0, composite))
     fitness = dict(cur.fetchone())
-    conn.close()
+    _db_pool.putconn(conn)
 
     return {
         "capability_id": cap_id,
@@ -1472,7 +1545,7 @@ def transition_capability(slug: str, cap_id: str, body: dict):
     cur.execute("SELECT * FROM capabilities WHERE id = %s", (cap_id,))
     cap = cur.fetchone()
     if not cap:
-        conn.close(); raise HTTPException(404, "Not found")
+        _db_pool.putconn(conn); raise HTTPException(404, "Not found")
 
     from_stage = cap["stage"]
 
@@ -1485,7 +1558,7 @@ def transition_capability(slug: str, cap_id: str, body: dict):
         "retiring": ["deprecated"],
     }
     if to_stage not in valid.get(from_stage, []):
-        conn.close()
+        _db_pool.putconn(conn)
         raise HTTPException(400, f"Invalid transition {from_stage} -> {to_stage}")
 
     # Hash chain
@@ -1505,7 +1578,7 @@ def transition_capability(slug: str, cap_id: str, body: dict):
 
     # Update capability stage
     cur.execute("UPDATE capabilities SET stage = %s WHERE id = %s", (to_stage, cap_id))
-    conn.close()
+    _db_pool.putconn(conn)
 
     return {"governance_event": _ser(gov), "capability_id": cap_id, "from": from_stage, "to": to_stage}
 
@@ -1517,7 +1590,7 @@ def verify_chain(slug: str):
     conn = get_db(); cur = _dict_cur(conn); tid = _tenant_id(cur, slug)
     cur.execute("SELECT id, prev_hash, this_hash FROM governance_events WHERE tenant_id = %s ORDER BY id", (tid,))
     events = cur.fetchall()
-    conn.close()
+    _db_pool.putconn(conn)
 
     if not events:
         return {"valid": True, "chain_length": 0}
@@ -1533,13 +1606,13 @@ def verify_chain(slug: str):
 
 # ═══ DEMO RESET (Checkpoint 6) ═══
 @app.post("/api/demo/reset")
-def demo_reset():
+def demo_reset(api_key: str = Depends(verify_api_key)):
     """Reset Acme tenant to t+0 state."""
     conn = get_db(); cur = conn.cursor()
     cur.execute("SELECT id FROM tenants WHERE slug = 'acme_robotics'")
     row = cur.fetchone()
     if not row:
-        conn.close(); return {"error": "No acme tenant"}
+        _db_pool.putconn(conn); return {"error": "No acme tenant"}
     tid = row[0]
     cur.execute("DELETE FROM fitness_scores WHERE capability_id IN (SELECT id FROM capabilities WHERE tenant_id = %s)", (tid,))
     cur.execute("DELETE FROM governance_events WHERE tenant_id = %s", (tid,))
@@ -1547,13 +1620,13 @@ def demo_reset():
     cur.execute("DELETE FROM capability_gaps WHERE tenant_id = %s", (tid,))
     cur.execute("UPDATE signals SET clustered_into = NULL, embedding = NULL WHERE tenant_id = %s", (tid,))
     conn.commit()
-    conn.close()
+    _db_pool.putconn(conn)
     return {"status": "reset", "tenant": "acme_robotics"}
 
 
 # ═══ DEMO FULL-RESET (Checkpoint 6+) ═══
 @app.post("/api/demo/full-reset")
-def demo_full_reset():
+def demo_full_reset(api_key: str = Depends(verify_api_key)):
     """Full reset: clear all generated data, reset signal clusters, delete generated skill files, then re-run reflection loop."""
     import sys, os, shutil
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -1562,7 +1635,7 @@ def demo_full_reset():
     cur.execute("SELECT id FROM tenants WHERE slug = 'acme_robotics'")
     row = cur.fetchone()
     if not row:
-        conn.close(); return {"error": "No acme tenant"}
+        _db_pool.putconn(conn); return {"error": "No acme tenant"}
     tid = row[0]
 
     # 1. Delete generated capability data
@@ -1575,7 +1648,7 @@ def demo_full_reset():
     cur.execute("UPDATE signals SET clustered_into = NULL WHERE tenant_id = %s", (tid,))
 
     conn.commit()
-    conn.close()
+    _db_pool.putconn(conn)
 
     # 3. Delete generated skill directories
     generated_dir = os.path.join(
@@ -1606,7 +1679,7 @@ def list_external_agents(slug: str, kind: Optional[str] = None):
     p: list = [tid]
     if kind: q += " AND kind=%s"; p.append(kind)
     q += " ORDER BY trust_score DESC"
-    cur.execute(q, p); rows = cur.fetchall(); conn.close()
+    cur.execute(q, p); rows = cur.fetchall(); _db_pool.putconn(conn)
     return [_ser(r) for r in rows]
 
 
@@ -1615,9 +1688,9 @@ def get_external_agent(slug: str, agent_id: str):
     conn = get_db(); cur = _dict_cur(conn)
     cur.execute("SELECT * FROM external_agents WHERE id=%s", (agent_id,))
     agent = cur.fetchone()
-    if not agent: conn.close(); raise HTTPException(404, "Not found")
+    if not agent: _db_pool.putconn(conn); raise HTTPException(404, "Not found")
     cur.execute("SELECT * FROM agent_interactions WHERE external_agent_id=%s ORDER BY created_at DESC LIMIT 20", (agent_id,))
-    interactions = cur.fetchall(); conn.close()
+    interactions = cur.fetchall(); _db_pool.putconn(conn)
     return {**_ser(agent), "recent_interactions": [_ser(i) for i in interactions]}
 
 
@@ -1631,7 +1704,7 @@ def list_interactions(slug: str, kind: Optional[str] = None, status: Optional[st
     q += " ORDER BY i.created_at DESC LIMIT %s"; p.append(limit)
     cur.execute(q, p); rows = cur.fetchall()
     cur.execute("SELECT count(*) FROM agent_interactions WHERE tenant_id=%s", (tid,))
-    total = cur.fetchone()["count"]; conn.close()
+    total = cur.fetchone()["count"]; _db_pool.putconn(conn)
     return {"items": [_ser(r) for r in rows], "total": total}
 
 
@@ -1646,7 +1719,7 @@ def gateway_stats(slug: str):
     by_type = {r["interaction_type"]: r["cnt"] for r in cur.fetchall()}
     cur.execute("SELECT e.kind, avg(e.trust_score) as avg_trust FROM external_agents e WHERE e.tenant_id=%s GROUP BY e.kind", (tid,))
     trust_by_kind = {r["kind"]: round(float(r["avg_trust"]), 4) for r in cur.fetchall()}
-    conn.close()
+    _db_pool.putconn(conn)
     return {"agents": agents, "interactions": {**interactions, "avg_latency_ms": round(float(interactions["avg_latency"] or 0))}, "by_type": by_type, "trust_by_kind": trust_by_kind}
 
 
@@ -1679,7 +1752,7 @@ def dashboard(slug: str):
     # Governance
     cur.execute("SELECT COUNT(*) FROM governance_events WHERE tenant_id=%s", (tid,))
     gov_count = cur.fetchone()["count"]
-    conn.close()
+    _db_pool.putconn(conn)
     return {
         "tenant": slug, "generation": gen,
         "capabilities": {"count": cap_count, "by_stage": stages},

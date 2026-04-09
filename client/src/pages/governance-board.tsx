@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,10 +99,39 @@ export default function GovernanceBoard() {
 
   // ── Section 1 state ────────────────────────────────────────────────────────
   const [selectedGapId, setSelectedGapId] = useState<string | null>(null);
-  const [generatedCapId, setGeneratedCapId] = useState<Record<number, number>>({});
-  const [generateResults, setGenerateResults] = useState<Record<number, any>>({});
-  const [arenaResults, setArenaResults] = useState<Record<number, any>>({});
-  const [transitionDone, setTransitionDone] = useState<Record<number, boolean>>({});
+  const [generatedCapId, setGeneratedCapId] = useState<Record<number, number>>(() => {
+    try {
+      const saved = localStorage.getItem("fluid-governance-state");
+      return saved ? JSON.parse(saved).generatedCapId ?? {} : {};
+    } catch { return {}; }
+  });
+  const [generateResults, setGenerateResults] = useState<Record<number, any>>(() => {
+    try {
+      const saved = localStorage.getItem("fluid-governance-state");
+      return saved ? JSON.parse(saved).generateResults ?? {} : {};
+    } catch { return {}; }
+  });
+  const [arenaResults, setArenaResults] = useState<Record<number, any>>(() => {
+    try {
+      const saved = localStorage.getItem("fluid-governance-state");
+      return saved ? JSON.parse(saved).arenaResults ?? {} : {};
+    } catch { return {}; }
+  });
+  const [transitionDone, setTransitionDone] = useState<Record<number, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("fluid-governance-state");
+      return saved ? JSON.parse(saved).transitionDone ?? {} : {};
+    } catch { return {}; }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "fluid-governance-state",
+        JSON.stringify({ generatedCapId, generateResults, arenaResults, transitionDone })
+      );
+    } catch { /* storage unavailable */ }
+  }, [generatedCapId, generateResults, arenaResults, transitionDone]);
   const [showEvidence, setShowEvidence] = useState(false);
   const [generatingGap, setGeneratingGap] = useState<number | null>(null);
   const [arenaRunning, setArenaRunning] = useState<number | null>(null);
@@ -762,8 +791,8 @@ export default function GovernanceBoard() {
         <CardContent>
           <div className="space-y-3">
             {(councilReviews ?? []).map((review: any) => {
-              const reviewerAgents = JSON.parse(review.reviewerAgents || "[]");
-              const votes = JSON.parse(review.votes || "{}");
+              const reviewerAgents = typeof review.reviewerAgents === "string" ? JSON.parse(review.reviewerAgents || "[]") : (review.reviewerAgents || []);
+              const votes = typeof review.votes === "string" ? JSON.parse(review.votes || "{}") : (review.votes || {});
 
               return (
                 <div

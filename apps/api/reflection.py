@@ -448,7 +448,7 @@ def _analyze_with_claude(tenant_id: str, cluster: dict) -> Optional[dict]:
 
 # ═══ Full Reflection Loop ═══
 
-def run_reflection_loop(tenant_slug: str = "acme_robotics") -> dict:
+def run_reflection_loop(tenant_slug: str = "acme_robotics", force: bool = False) -> dict:
     """Run the complete reflection loop: embed → cluster → synthesize."""
     start = time.time()
 
@@ -461,7 +461,18 @@ def run_reflection_loop(tenant_slug: str = "acme_robotics") -> dict:
     tenant_id = str(row[0])
     conn.close()
 
-    # Clear previous gaps
+    # Check if gaps already exist for this tenant
+    conn = psycopg2.connect(DATABASE_URL)
+    conn.autocommit = True
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM capability_gaps WHERE tenant_id = %s LIMIT 1", (tenant_id,))
+    gaps_exist = cur.fetchone() is not None
+    conn.close()
+
+    if gaps_exist and not force:
+        return {"skipped": True, "reason": "gaps already exist; use force=True to re-run"}
+
+    # Clear previous gaps (only reached if force=True or no gaps exist)
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = True
     cur = conn.cursor()
