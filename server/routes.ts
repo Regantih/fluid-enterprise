@@ -367,6 +367,10 @@ export function registerRoutes(server: Server, app: Express): void {
     try { res.json(await proxyToFastAPI("/api/tenants/acme_robotics/dashboard")); }
     catch (e: any) { res.status(502).json({ error: e.message }); }
   });
+  app.post("/api/demo/full-reset", async (_req, res) => {
+    try { res.json(await proxyToFastAPI("/api/demo/full-reset", "POST")); }
+    catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
 
   // ═══ SIMULATION ROUTES (all other pages) ═══
 

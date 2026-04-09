@@ -447,6 +447,53 @@ def demo_reset():
     return {"status": "reset", "tenant": "acme_robotics"}
 
 
+# ═══ DEMO FULL-RESET (Checkpoint 6+) ═══
+@app.post("/api/demo/full-reset")
+def demo_full_reset():
+    """Full reset: clear all generated data, reset signal clusters, delete generated skill files, then re-run reflection loop."""
+    import sys, os, shutil
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT id FROM tenants WHERE slug = 'acme_robotics'")
+    row = cur.fetchone()
+    if not row:
+        conn.close(); return {"error": "No acme tenant"}
+    tid = row[0]
+
+    # 1. Delete generated capability data
+    cur.execute("DELETE FROM fitness_scores WHERE capability_id IN (SELECT id FROM capabilities WHERE tenant_id = %s)", (tid,))
+    cur.execute("DELETE FROM governance_events WHERE tenant_id = %s", (tid,))
+    cur.execute("DELETE FROM capabilities WHERE tenant_id = %s", (tid,))
+    cur.execute("DELETE FROM capability_gaps WHERE tenant_id = %s", (tid,))
+
+    # 2. Reset signals.clustered_into to NULL (keep embeddings to avoid re-embedding)
+    cur.execute("UPDATE signals SET clustered_into = NULL WHERE tenant_id = %s", (tid,))
+
+    conn.commit()
+    conn.close()
+
+    # 3. Delete generated skill directories
+    generated_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "packages", "skills", "generated"
+    )
+    if os.path.isdir(generated_dir):
+        for entry in os.listdir(generated_dir):
+            entry_path = os.path.join(generated_dir, entry)
+            if os.path.isdir(entry_path):
+                shutil.rmtree(entry_path)
+            else:
+                os.remove(entry_path)
+
+    # 4. Re-run reflection loop to regenerate gaps
+    from apps.api.reflection import run_reflection_loop
+    result = run_reflection_loop("acme_robotics")
+    gaps_created = result.get("gaps_created", 0) if isinstance(result, dict) else 0
+
+    return {"status": "reset_complete", "gaps_created": gaps_created}
+
+
 # ═══ AGENT GATEWAY (External Agents) ═══
 @app.get("/api/tenants/{slug}/external-agents")
 def list_external_agents(slug: str, kind: Optional[str] = None):
