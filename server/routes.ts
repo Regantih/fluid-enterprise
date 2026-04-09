@@ -313,16 +313,75 @@ function startSimulation(): void {
   }, 60000);
 }
 
+// ─── FastAPI proxy for demo-critical paths ───────────────────────────────────
+const FASTAPI = "http://localhost:8000";
+async function proxyToFastAPI(path: string, method: string = "GET", body?: any): Promise<any> {
+  const opts: any = { method, headers: { "Content-Type": "application/json" } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${FASTAPI}${path}`, opts);
+  if (!res.ok) throw new Error(`FastAPI ${res.status}`);
+  return res.json();
+}
+
 // ─── Route registration ───────────────────────────────────────────────────────
 export function registerRoutes(server: Server, app: Express): void {
   // Seed the world on startup
   seedWorld();
-
   // Start live simulation
   startSimulation();
 
-  // ── GET /api/dashboard ────────────────────────────────────────────────────
-  app.get("/api/dashboard", (_req, res) => {
+  // ═══ DEMO-CRITICAL: proxy to FastAPI/Postgres ═══
+  app.get("/api/gaps", async (_req, res) => {
+    try { res.json(await proxyToFastAPI("/api/tenants/acme_robotics/gaps")); }
+    catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
+  app.get("/api/gaps/:gapId/signals", async (req, res) => {
+    try {
+      const gaps = await proxyToFastAPI("/api/tenants/acme_robotics/gaps");
+      const gap = gaps.find((g: any) => g.id === req.params.gapId);
+      if (!gap) return res.status(404).json({ error: "Gap not found" });
+      const sigs = [];
+      for (const sid of (gap.evidence_signal_ids || []).slice(0, 12)) {
+        try { sigs.push(await proxyToFastAPI(`/api/tenants/acme_robotics/signals/${sid}`)); } catch {}
+      }
+      res.json({ gap, signals: sigs });
+    } catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
+  app.post("/api/generator/generate", async (req, res) => {
+    try { res.json(await proxyToFastAPI("/api/tenants/acme_robotics/generator/generate", "POST", req.body)); }
+    catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
+  app.post("/api/arena/evaluate/:capId", async (req, res) => {
+    try { res.json(await proxyToFastAPI(`/api/tenants/acme_robotics/arena/evaluate/${req.params.capId}`, "POST")); }
+    catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
+  app.post("/api/real/capabilities/:capId/transition", async (req, res) => {
+    try { res.json(await proxyToFastAPI(`/api/tenants/acme_robotics/capabilities/${req.params.capId}/transition`, "POST", req.body)); }
+    catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
+  app.get("/api/real/capabilities", async (_req, res) => {
+    try { res.json(await proxyToFastAPI("/api/tenants/acme_robotics/capabilities")); }
+    catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
+  app.get("/api/real/dashboard", async (_req, res) => {
+    try { res.json(await proxyToFastAPI("/api/tenants/acme_robotics/dashboard")); }
+    catch (e: any) { res.status(502).json({ error: e.message }); }
+  });
+
+  // ═══ SIMULATION ROUTES (all other pages) ═══
+
+  // ── GET /api/dashboard (merges simulation + real Postgres data) ───────────
+  app.get("/api/dashboard", async (_req, res) => {
+    // Try to enrich with real Postgres data for the generation counter
+    let realGeneration = 0;
+    let realGapCount = 0;
+    let realCapCount = 0;
+    try {
+      const rd = await proxyToFastAPI("/api/tenants/acme_robotics/dashboard");
+      realGeneration = rd.generation || 0;
+      realGapCount = rd.gaps_open || 0;
+      realCapCount = rd.capabilities?.count || 0;
+    } catch { /* fallback to simulation data */ }
     const allCaps = storage.getCapabilities();
     const allAgents = storage.getAgents();
     const pendingGov = storage.getPendingGovernance();
@@ -386,11 +445,17 @@ export function registerRoutes(server: Server, app: Express): void {
         pendingGovernance: pendingGov.length,
         trustIndexAvg: Math.round(avgTrust * 1000) / 1000,
         systemFitness: Math.round(avgFitness * 1000) / 1000,
-        evolutionGeneration: maxGeneration,
+        evolutionGeneration: Math.max(maxGeneration, realGeneration),
       },
       recentActivity,
       costTrend,
       latestEvolution,
+      // Real Postgres data for demo path
+      realData: {
+        generation: realGeneration,
+        gapsOpen: realGapCount,
+        capabilitiesGenerated: realCapCount,
+      },
     });
   });
 
