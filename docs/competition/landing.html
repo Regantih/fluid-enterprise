@@ -1,0 +1,1918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Fluid Enterprise — Self-Evolving Enterprise Platform</title>
+  <meta name="description" content="The first self-evolving enterprise platform. Built on the principles of AlphaGo → AlphaZero → AlphaEvolve. Capabilities are genomes. Fitness is the objective function.">
+  <meta property="og:title" content="The Fluid Enterprise">
+  <meta property="og:description" content="The first self-evolving enterprise platform. Built for the Perplexity Billion Dollar Build competition.">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,2 28,9 28,23 16,30 4,23 4,9' fill='none' stroke='%230ea5e9' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%230ea5e9'/%3E%3C/svg%3E">
+  <style>
+    /* ===== RESET & BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      scroll-behavior: smooth;
+      scroll-padding-top: 2rem;
+    }
+
+    :root {
+      --bg: #0a0e14;
+      --bg-elevated: #0f1319;
+      --bg-card: #111620;
+      --bg-card-hover: #161c28;
+      --border: #1a2030;
+      --border-glow: #0ea5e920;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --text-faint: #4a5568;
+      --cyan: #0ea5e9;
+      --cyan-dim: #0c8bc4;
+      --cyan-glow: #0ea5e930;
+      --amber: #f59e0b;
+      --amber-hover: #d97706;
+      --amber-glow: #f59e0b20;
+      --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+      --content-max: 1200px;
+      --content-narrow: 800px;
+    }
+
+    body {
+      min-height: 100dvh;
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--text);
+      background-color: var(--bg);
+      overflow-x: hidden;
+    }
+
+    ::selection {
+      background: rgba(14, 165, 233, 0.25);
+      color: #fff;
+    }
+
+    img, svg { display: block; max-width: 100%; height: auto; }
+    a { color: var(--cyan); text-decoration: none; transition: color var(--transition); }
+    a:hover { color: #38bdf8; }
+
+    h1, h2, h3, h4, h5, h6 { line-height: 1.15; text-wrap: balance; }
+    p { text-wrap: pretty; max-width: 72ch; }
+
+    :focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    /* ===== UTILITY ===== */
+    .container {
+      width: 100%;
+      max-width: var(--content-max);
+      margin: 0 auto;
+      padding: 0 clamp(1.5rem, 5vw, 3rem);
+    }
+
+    .container--narrow {
+      max-width: var(--content-narrow);
+    }
+
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .section-label::before {
+      content: '';
+      display: block;
+      width: 2rem;
+      height: 1px;
+      background: var(--cyan);
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 1.2rem + 2.5vw, 3.5rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #fff;
+      margin-bottom: 1.5rem;
+    }
+
+    .section-text {
+      font-size: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+      color: var(--text-muted);
+      line-height: 1.7;
+      max-width: 65ch;
+    }
+
+    /* ===== SCROLL ANIMATIONS ===== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+    .reveal-delay-5 { transition-delay: 0.5s; }
+    .reveal-delay-6 { transition-delay: 0.6s; }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.875rem 2rem;
+      font-family: var(--font-body);
+      font-size: 0.9375rem;
+      font-weight: 600;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all var(--transition);
+      text-decoration: none;
+    }
+
+    .btn--primary {
+      background: var(--amber);
+      color: #0a0e14;
+    }
+    .btn--primary:hover {
+      background: var(--amber-hover);
+      color: #0a0e14;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px var(--amber-glow);
+    }
+    .btn--primary:active { transform: translateY(0); }
+
+    .btn--secondary {
+      background: transparent;
+      color: var(--cyan);
+      border: 1px solid var(--border);
+    }
+    .btn--secondary:hover {
+      border-color: var(--cyan);
+      background: rgba(14, 165, 233, 0.05);
+      color: var(--cyan);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px var(--cyan-glow);
+    }
+    .btn--secondary:active { transform: translateY(0); }
+
+    .btn--ghost {
+      background: rgba(14, 165, 233, 0.08);
+      color: var(--cyan);
+      border: 1px solid rgba(14, 165, 233, 0.15);
+    }
+    .btn--ghost:hover {
+      background: rgba(14, 165, 233, 0.14);
+      border-color: rgba(14, 165, 233, 0.3);
+      color: var(--cyan);
+      transform: translateY(-2px);
+    }
+    .btn--ghost:active { transform: translateY(0); }
+
+    /* ===== BACKGROUND EFFECTS ===== */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      background-image:
+        linear-gradient(rgba(14, 165, 233, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14, 165, 233, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 50% at 50% 30%, black 40%, transparent 100%);
+    }
+
+    .bg-glow {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+    }
+    .bg-glow::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120%;
+      height: 60%;
+      background: radial-gradient(ellipse at center, rgba(14, 165, 233, 0.06) 0%, transparent 70%);
+    }
+    .bg-glow::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 40%;
+      background: radial-gradient(ellipse at 20% 100%, rgba(14, 165, 233, 0.04) 0%, transparent 50%),
+                  radial-gradient(ellipse at 80% 100%, rgba(245, 158, 11, 0.03) 0%, transparent 50%);
+    }
+
+    /* ===== SECTION 1: HERO ===== */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: clamp(6rem, 12vh, 10rem) clamp(1.5rem, 5vw, 3rem);
+      position: relative;
+    }
+
+    .hero-logo {
+      margin-bottom: 2.5rem;
+    }
+
+    .hero-logo svg {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto;
+      filter: drop-shadow(0 0 20px rgba(14, 165, 233, 0.3));
+    }
+
+    .hero h1 {
+      font-size: clamp(3rem, 1rem + 6vw, 6rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      color: #fff;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(135deg, #fff 0%, #e2e8f0 50%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-tagline {
+      font-size: clamp(1rem, 0.85rem + 0.75vw, 1.375rem);
+      color: var(--text-muted);
+      max-width: 52ch;
+      margin: 0 auto 1rem;
+      line-height: 1.6;
+    }
+
+    .hero-tagline .evo-chain {
+      color: var(--cyan);
+      font-weight: 500;
+    }
+
+    .hero-subline {
+      font-size: clamp(0.9375rem, 0.875rem + 0.3vw, 1.0625rem);
+      color: var(--text-faint);
+      max-width: 60ch;
+      margin: 0 auto 2.5rem;
+      line-height: 1.7;
+      font-style: italic;
+    }
+
+    .hero-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+
+    .hero-built {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-faint);
+      letter-spacing: 0.05em;
+    }
+
+    .hero-scroll-hint {
+      position: absolute;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-faint);
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      animation: float 2s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(6px); }
+    }
+
+    .hero-scroll-hint svg {
+      width: 20px;
+      height: 20px;
+      opacity: 0.4;
+    }
+
+    /* ===== DIVIDER ===== */
+    .section-divider {
+      width: 100%;
+      max-width: var(--content-max);
+      margin: 0 auto;
+      padding: 0 clamp(1.5rem, 5vw, 3rem);
+    }
+    .section-divider::after {
+      content: '';
+      display: block;
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), var(--cyan-glow), var(--border), transparent);
+    }
+
+    /* ===== SECTION 2: THE PROBLEM ===== */
+    .problem {
+      padding: clamp(5rem, 10vh, 8rem) 0;
+    }
+
+    .problem-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .problem-stat {
+      padding: 2rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .problem-stat::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--cyan), transparent);
+    }
+
+    .problem-stat-number {
+      font-family: var(--font-mono);
+      font-size: clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem);
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+    }
+
+    .problem-stat-desc {
+      font-size: 0.9375rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .problem-text {
+      font-size: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+      color: var(--text-muted);
+      line-height: 1.8;
+      max-width: 65ch;
+    }
+
+    /* ===== SECTION 3: HOW IT WORKS ===== */
+    .pillars {
+      padding: clamp(5rem, 10vh, 8rem) 0;
+    }
+
+    .pillars-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.25rem;
+      margin-top: 3rem;
+    }
+
+    .pillar-card {
+      padding: 2rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pillar-card:hover {
+      border-color: rgba(14, 165, 233, 0.2);
+      background: var(--bg-card);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(14, 165, 233, 0.06);
+    }
+
+    .pillar-number {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--cyan);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+      opacity: 0.6;
+    }
+
+    .pillar-icon {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 1.25rem;
+      color: var(--cyan);
+    }
+
+    .pillar-title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.75rem;
+    }
+
+    .pillar-desc {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ===== SECTION 4: LIVE PROOF ===== */
+    .proof {
+      padding: clamp(5rem, 10vh, 8rem) 0;
+    }
+
+    .proof-header {
+      margin-bottom: 3rem;
+    }
+
+    .proof-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .proof-metric {
+      padding: 2rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      text-align: center;
+      position: relative;
+    }
+
+    .proof-metric::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      background: radial-gradient(ellipse at center, rgba(14, 165, 233, 0.03) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .proof-metric-value {
+      font-family: var(--font-mono);
+      font-size: clamp(1.5rem, 1rem + 1.5vw, 2.25rem);
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+
+    .proof-metric-label {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+
+    .proof-explanation {
+      font-size: 0.9375rem;
+      color: var(--text-muted);
+      line-height: 1.8;
+      max-width: 65ch;
+      margin-bottom: 2rem;
+    }
+
+    /* ===== SECTION 5: META-STORY ===== */
+    .meta {
+      padding: clamp(5rem, 10vh, 8rem) 0;
+    }
+
+    .meta-content {
+      max-width: 65ch;
+    }
+
+    .meta-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      margin: 2.5rem 0;
+      padding: 2rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-elevated);
+    }
+
+    .meta-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .meta-stat-value {
+      font-family: var(--font-mono);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+
+    .meta-stat-label {
+      font-size: 0.75rem;
+      color: var(--text-faint);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .meta-text {
+      font-size: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+      color: var(--text-muted);
+      line-height: 1.8;
+      margin-bottom: 1.5rem;
+    }
+
+    .meta-highlight {
+      font-size: clamp(1.125rem, 1rem + 0.5vw, 1.3125rem);
+      color: var(--text);
+      font-weight: 500;
+      line-height: 1.7;
+      border-left: 3px solid var(--cyan);
+      padding-left: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    /* ===== SECTION 6: BUSINESS MODEL ===== */
+    .business {
+      padding: clamp(5rem, 10vh, 8rem) 0;
+    }
+
+    .business-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      margin-top: 3rem;
+    }
+
+    .business-col {
+      padding: 2rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-elevated);
+    }
+
+    .business-col-title {
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .business-item {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(26, 32, 48, 0.5);
+    }
+    .business-item:last-child { border-bottom: none; }
+
+    .business-item-label {
+      font-size: 0.8125rem;
+      color: var(--text-faint);
+      margin-bottom: 0.25rem;
+    }
+
+    .business-item-value {
+      font-size: 0.9375rem;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .business-item-value--highlight {
+      color: var(--amber);
+      font-weight: 700;
+    }
+
+    /* ===== SECTION 7: COMPETITIVE LANDSCAPE ===== */
+    .competitive {
+      padding: clamp(5rem, 10vh, 8rem) 0;
+    }
+
+    .comp-table-wrapper {
+      overflow-x: auto;
+      margin-top: 3rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-elevated);
+    }
+
+    .comp-table {
+      width: 100%;
+      min-width: 700px;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    .comp-table thead {
+      background: rgba(14, 165, 233, 0.05);
+    }
+
+    .comp-table th {
+      padding: 1rem 1.25rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      letter-spacing: 0.03em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .comp-table th:first-child {
+      color: var(--text-faint);
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .comp-table th:last-child {
+      color: var(--cyan);
+    }
+
+    .comp-table td {
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid rgba(26, 32, 48, 0.5);
+      color: var(--text-muted);
+    }
+
+    .comp-table tr:last-child td { border-bottom: none; }
+
+    .comp-table td:first-child {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .comp-table td:last-child {
+      color: var(--cyan);
+      font-weight: 500;
+    }
+
+    .comp-no { color: var(--text-faint); }
+    .comp-partial { color: var(--amber); }
+    .comp-yes { color: var(--cyan); font-weight: 600; }
+
+    /* ===== SECTION 8: TEAM ===== */
+    .team {
+      padding: clamp(5rem, 10vh, 8rem) 0;
+    }
+
+    .team-card {
+      display: flex;
+      align-items: center;
+      gap: 2.5rem;
+      padding: 2.5rem;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--bg-elevated);
+      max-width: 640px;
+      margin-top: 3rem;
+    }
+
+    .team-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--cyan) 0%, rgba(14, 165, 233, 0.3) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 2rem;
+      font-weight: 800;
+      color: #0a0e14;
+    }
+
+    .team-info h3 {
+      font-size: 1.375rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.375rem;
+    }
+
+    .team-info-role {
+      font-size: 0.875rem;
+      color: var(--cyan);
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+    }
+
+    .team-info-bio {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      font-style: italic;
+    }
+
+    .team-info-link {
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      color: var(--text-faint);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .team-info-link:hover { color: var(--cyan); }
+    .team-info-link svg { width: 16px; height: 16px; }
+
+    /* ===== SECTION 9: CTA ===== */
+    .cta {
+      padding: clamp(6rem, 12vh, 10rem) 0;
+      text-align: center;
+      position: relative;
+    }
+
+    .cta::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan-glow), var(--cyan), var(--cyan-glow), transparent);
+    }
+
+    .cta h2 {
+      font-size: clamp(2.5rem, 1.5rem + 3vw, 4rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      color: #fff;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #fff 0%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .cta-sub {
+      font-size: clamp(0.9375rem, 0.875rem + 0.25vw, 1.0625rem);
+      color: var(--text-muted);
+      margin-bottom: 3rem;
+    }
+
+    .cta-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+    }
+
+    /* ===== FOOTER ===== */
+    .footer {
+      padding: 3rem 0;
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-text {
+      font-size: 0.75rem;
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+    }
+
+    /* ===== VIDEO SECTION (placeholder within proof) ===== */
+    #demo {
+      scroll-margin-top: 2rem;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      .pillars-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .business-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .team-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 1.5rem;
+      }
+
+      .hero-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .cta-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .meta-stats {
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .proof-metrics {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .proof-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .problem-stats {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ===== NODE ANIMATION (HERO BG) ===== */
+    .hero-canvas {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      overflow: hidden;
+    }
+
+    .hero-canvas canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ===== GLOWING DOT DECORATION ===== */
+    .glow-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan), 0 0 24px rgba(14, 165, 233, 0.3);
+      display: inline-block;
+    }
+
+    /* ===== EVOLUTION TIMELINE ===== */
+    .evo-timeline {
+      width: 100%;
+      max-width: 640px;
+      margin: 2rem auto 1.5rem;
+      position: relative;
+      padding: 2.5rem 0 1rem;
+    }
+
+    .evo-timeline-track {
+      position: relative;
+      height: 2px;
+      background: rgba(14, 165, 233, 0.12);
+      border-radius: 2px;
+      margin: 0 1rem;
+    }
+
+    .evo-timeline-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, rgba(14, 165, 233, 0.4) 0%, var(--cyan) 100%);
+      border-radius: 2px;
+      animation: drawLine 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+    }
+
+    @keyframes drawLine {
+      from { width: 0; }
+      to { width: 100%; }
+    }
+
+    .evo-timeline-points {
+      display: flex;
+      justify-content: space-between;
+      position: absolute;
+      top: 0;
+      left: 1rem;
+      right: 1rem;
+      transform: translateY(-50%);
+    }
+
+    .evo-point {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .evo-point-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 2px solid rgba(14, 165, 233, 0.35);
+      position: relative;
+      z-index: 2;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .evo-point--active .evo-point-dot {
+      background: var(--cyan);
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(14, 165, 233, 0.6), 0 0 20px rgba(14, 165, 233, 0.25);
+      width: 12px;
+      height: 12px;
+    }
+
+    .evo-point-label {
+      position: absolute;
+      bottom: calc(100% + 10px);
+      white-space: nowrap;
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      font-weight: 500;
+      color: var(--text-faint);
+      letter-spacing: 0.04em;
+      text-align: center;
+      opacity: 0;
+      animation: fadeInLabel 0.4s ease forwards;
+    }
+
+    .evo-point--active .evo-point-label {
+      color: var(--cyan);
+    }
+
+    .evo-point:nth-child(1) .evo-point-label { animation-delay: 0.5s; }
+    .evo-point:nth-child(2) .evo-point-label { animation-delay: 0.9s; }
+    .evo-point:nth-child(3) .evo-point-label { animation-delay: 1.3s; }
+    .evo-point:nth-child(4) .evo-point-label { animation-delay: 1.7s; }
+
+    .evo-point:nth-child(1) .evo-point-dot { animation: dotPop 0.3s ease 0.5s both; }
+    .evo-point:nth-child(2) .evo-point-dot { animation: dotPop 0.3s ease 0.9s both; }
+    .evo-point:nth-child(3) .evo-point-dot { animation: dotPop 0.3s ease 1.3s both; }
+    .evo-point:nth-child(4) .evo-point-dot { animation: dotPop 0.3s ease 1.7s both; }
+
+    @keyframes fadeInLabel {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes dotPop {
+      0% { transform: scale(0.4); opacity: 0; }
+      60% { transform: scale(1.2); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .evo-point-year {
+      position: absolute;
+      top: calc(100% + 8px);
+      white-space: nowrap;
+      font-family: var(--font-mono);
+      font-size: 0.625rem;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      opacity: 0;
+      animation: fadeInLabel 0.4s ease forwards;
+    }
+
+    .evo-point:nth-child(1) .evo-point-year { animation-delay: 0.6s; }
+    .evo-point:nth-child(2) .evo-point-year { animation-delay: 1.0s; }
+    .evo-point:nth-child(3) .evo-point-year { animation-delay: 1.4s; }
+    .evo-point:nth-child(4) .evo-point-year { animation-delay: 1.8s; }
+
+    /* ===== COMPETITIVE MOAT SECTION ===== */
+    .moat {
+      padding: clamp(5rem, 10vh, 8rem) 0;
+    }
+
+    .moat .section-label {
+      color: var(--amber);
+    }
+
+    .moat .section-label::before {
+      background: var(--amber);
+    }
+
+    .moat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.25rem;
+      margin-top: 3rem;
+    }
+
+    .moat-card {
+      padding: 2rem;
+      border: 1px solid rgba(245, 158, 11, 0.12);
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .moat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--amber), transparent);
+    }
+
+    .moat-card:hover {
+      border-color: rgba(245, 158, 11, 0.25);
+      background: var(--bg-card);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(245, 158, 11, 0.07);
+    }
+
+    .moat-icon {
+      width: 44px;
+      height: 44px;
+      margin-bottom: 1.25rem;
+      color: var(--amber);
+    }
+
+    .moat-title {
+      font-size: 1.0625rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.75rem;
+    }
+
+    .moat-desc {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    @media (max-width: 768px) {
+      .moat-grid {
+        grid-template-columns: 1fr;
+      }
+      .evo-timeline {
+        max-width: 100%;
+        padding: 2rem 0.5rem 1rem;
+      }
+    }
+
+    /* ===== PITCH VIDEO CONTAINER ===== */
+    .pitch-video-container {
+      display: block;
+      margin-top: 2rem;
+      border-radius: 12px;
+      border: 1px solid rgba(14, 165, 233, 0.25);
+      background: var(--bg-card);
+      overflow: hidden;
+      position: relative;
+      aspect-ratio: 16 / 9;
+      max-width: 640px;
+      text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 0 0 0 rgba(14, 165, 233, 0);
+    }
+
+    .pitch-video-container:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 0 32px rgba(14, 165, 233, 0.12);
+      transform: translateY(-2px);
+    }
+
+    .pitch-video-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 30% 50%, rgba(14, 165, 233, 0.06) 0%, transparent 60%),
+        linear-gradient(135deg, #0d1420 0%, #0a0e14 100%);
+    }
+
+    .pitch-video-content {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+    }
+
+    .pitch-video-play {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(14, 165, 233, 0.12);
+      border: 2px solid rgba(14, 165, 233, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+    }
+
+    .pitch-video-container:hover .pitch-video-play {
+      background: rgba(14, 165, 233, 0.22);
+      border-color: var(--cyan);
+      box-shadow: 0 0 24px rgba(14, 165, 233, 0.3);
+      transform: scale(1.08);
+    }
+
+    .pitch-video-play svg {
+      width: 28px;
+      height: 28px;
+      color: var(--cyan);
+      margin-left: 4px;
+    }
+
+    .pitch-video-label {
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+
+    .pitch-video-sublabel {
+      font-size: 0.75rem;
+      color: var(--text-faint);
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <!-- Background Effects -->
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow" aria-hidden="true"></div>
+
+  <!-- SECTION 1: HERO -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-canvas" aria-hidden="true">
+      <canvas id="heroCanvas"></canvas>
+    </div>
+
+    <div class="hero-logo reveal">
+      <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="The Fluid Enterprise logo">
+        <!-- Outer hexagon -->
+        <polygon points="60,8 106,32 106,88 60,112 14,88 14,32" stroke="#0ea5e9" stroke-width="1.5" fill="none" opacity="0.3"/>
+        <!-- Inner hexagon -->
+        <polygon points="60,28 86,44 86,76 60,92 34,76 34,44" stroke="#0ea5e9" stroke-width="1.5" fill="none" opacity="0.6"/>
+        <!-- Center node -->
+        <circle cx="60" cy="60" r="6" fill="#0ea5e9" opacity="0.9"/>
+        <!-- Outer nodes -->
+        <circle cx="60" cy="8" r="3" fill="#0ea5e9" opacity="0.5"/>
+        <circle cx="106" cy="32" r="3" fill="#0ea5e9" opacity="0.5"/>
+        <circle cx="106" cy="88" r="3" fill="#0ea5e9" opacity="0.5"/>
+        <circle cx="60" cy="112" r="3" fill="#0ea5e9" opacity="0.5"/>
+        <circle cx="14" cy="88" r="3" fill="#0ea5e9" opacity="0.5"/>
+        <circle cx="14" cy="32" r="3" fill="#0ea5e9" opacity="0.5"/>
+        <!-- Inner nodes -->
+        <circle cx="60" cy="28" r="3.5" fill="#0ea5e9" opacity="0.7"/>
+        <circle cx="86" cy="44" r="3.5" fill="#0ea5e9" opacity="0.7"/>
+        <circle cx="86" cy="76" r="3.5" fill="#0ea5e9" opacity="0.7"/>
+        <circle cx="60" cy="92" r="3.5" fill="#0ea5e9" opacity="0.7"/>
+        <circle cx="34" cy="76" r="3.5" fill="#0ea5e9" opacity="0.7"/>
+        <circle cx="34" cy="44" r="3.5" fill="#0ea5e9" opacity="0.7"/>
+        <!-- Connection lines center to inner -->
+        <line x1="60" y1="60" x2="60" y2="28" stroke="#0ea5e9" stroke-width="0.8" opacity="0.3"/>
+        <line x1="60" y1="60" x2="86" y2="44" stroke="#0ea5e9" stroke-width="0.8" opacity="0.3"/>
+        <line x1="60" y1="60" x2="86" y2="76" stroke="#0ea5e9" stroke-width="0.8" opacity="0.3"/>
+        <line x1="60" y1="60" x2="60" y2="92" stroke="#0ea5e9" stroke-width="0.8" opacity="0.3"/>
+        <line x1="60" y1="60" x2="34" y2="76" stroke="#0ea5e9" stroke-width="0.8" opacity="0.3"/>
+        <line x1="60" y1="60" x2="34" y2="44" stroke="#0ea5e9" stroke-width="0.8" opacity="0.3"/>
+        <!-- Connection lines inner to outer -->
+        <line x1="60" y1="28" x2="60" y2="8" stroke="#0ea5e9" stroke-width="0.5" opacity="0.2"/>
+        <line x1="86" y1="44" x2="106" y2="32" stroke="#0ea5e9" stroke-width="0.5" opacity="0.2"/>
+        <line x1="86" y1="76" x2="106" y2="88" stroke="#0ea5e9" stroke-width="0.5" opacity="0.2"/>
+        <line x1="60" y1="92" x2="60" y2="112" stroke="#0ea5e9" stroke-width="0.5" opacity="0.2"/>
+        <line x1="34" y1="76" x2="14" y2="88" stroke="#0ea5e9" stroke-width="0.5" opacity="0.2"/>
+        <line x1="34" y1="44" x2="14" y2="32" stroke="#0ea5e9" stroke-width="0.5" opacity="0.2"/>
+        <!-- Pulse animation on center -->
+        <circle cx="60" cy="60" r="6" fill="none" stroke="#0ea5e9" opacity="0.4">
+          <animate attributeName="r" values="6;18;6" dur="3s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.4;0;0.4" dur="3s" repeatCount="indefinite"/>
+        </circle>
+      </svg>
+    </div>
+
+    <h1 id="hero-title" class="reveal reveal-delay-1">The Fluid Enterprise</h1>
+
+    <p class="hero-tagline reveal reveal-delay-2">
+      The first self-evolving enterprise platform. Built on the principles of
+      <span class="evo-chain">AlphaGo → AlphaZero → AlphaEvolve</span>.
+    </p>
+
+    <p class="hero-subline reveal reveal-delay-3">
+      Capabilities are genomes. Fitness is the objective function. Every generation, the enterprise is measurably more fit than the last.
+    </p>
+
+    <div class="hero-buttons reveal reveal-delay-4">
+      <a href="#demo" class="btn btn--secondary">Watch Demo</a>
+      <a href="https://www.perplexity.ai/computer/a/fluid-enterprise-self-evolving-AjKstajoRvmPDoogEI3ISw" class="btn btn--primary" target="_blank" rel="noopener">Try the App →</a>
+    </div>
+
+    <!-- Evolution Timeline -->
+    <div class="evo-timeline reveal reveal-delay-5" aria-label="AlphaGo evolution lineage" role="img">
+      <div class="evo-timeline-track">
+        <div class="evo-timeline-fill"></div>
+        <div class="evo-timeline-points">
+          <div class="evo-point">
+            <span class="evo-point-label">AlphaGo</span>
+            <div class="evo-point-dot"></div>
+            <span class="evo-point-year">2016</span>
+          </div>
+          <div class="evo-point">
+            <span class="evo-point-label">AlphaZero</span>
+            <div class="evo-point-dot"></div>
+            <span class="evo-point-year">2017</span>
+          </div>
+          <div class="evo-point">
+            <span class="evo-point-label">AlphaEvolve</span>
+            <div class="evo-point-dot"></div>
+            <span class="evo-point-year">2025</span>
+          </div>
+          <div class="evo-point evo-point--active">
+            <span class="evo-point-label">Fluid Enterprise</span>
+            <div class="evo-point-dot"></div>
+            <span class="evo-point-year">2026</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="hero-built reveal reveal-delay-6">Built entirely with Perplexity Computer in a single session</p>
+
+    <div class="hero-scroll-hint" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+      </svg>
+    </div>
+  </section>
+
+  <div class="section-divider" aria-hidden="true"></div>
+
+  <!-- SECTION 2: THE PROBLEM -->
+  <section class="problem" aria-labelledby="problem-title">
+    <div class="container">
+      <div class="section-label reveal">The Problem</div>
+      <h2 class="section-title reveal" id="problem-title">Enterprise software is stuck in a prior era.</h2>
+
+      <div class="problem-stats">
+        <div class="problem-stat reveal reveal-delay-1">
+          <div class="problem-stat-number">$500B+</div>
+          <div class="problem-stat-desc">Spent on enterprise software annually</div>
+        </div>
+        <div class="problem-stat reveal reveal-delay-2">
+          <div class="problem-stat-number">900+</div>
+          <div class="problem-stat-desc">Applications in the average Global 2000 company</div>
+        </div>
+        <div class="problem-stat reveal reveal-delay-3">
+          <div class="problem-stat-number">60%</div>
+          <div class="problem-stat-desc">Of working time spent operating software, not thinking</div>
+        </div>
+      </div>
+
+      <p class="problem-text reveal">
+        Enterprise software still reflects the constraints of a prior era. Siloed systems. Manual reconciliation. Workflow walls between teams. Business activities have not changed, but the architecture for how work gets delivered must.
+      </p>
+    </div>
+  </section>
+
+  <div class="section-divider" aria-hidden="true"></div>
+
+  <!-- SECTION 3: HOW IT WORKS — THE SEVEN PILLARS -->
+  <section class="pillars" aria-labelledby="pillars-title">
+    <div class="container">
+      <div class="section-label reveal">How It Works</div>
+      <h2 class="section-title reveal" id="pillars-title">The Seven Pillars</h2>
+      <p class="section-text reveal">A self-evolving architecture inspired by evolutionary computation. Each pillar works in concert to discover, generate, evaluate, and promote enterprise capabilities — autonomously.</p>
+
+      <div class="pillars-grid">
+        <!-- Pillar 1: Signal Layer -->
+        <div class="pillar-card reveal reveal-delay-1">
+          <div class="pillar-number">01</div>
+          <svg class="pillar-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="24" cy="24" r="4"/>
+            <path d="M16.5 16.5a10.6 10.6 0 0 1 15 0"/>
+            <path d="M11 11a18 18 0 0 1 26 0"/>
+            <path d="M31.5 31.5a10.6 10.6 0 0 1-15 0"/>
+            <path d="M37 37a18 18 0 0 1-26 0"/>
+          </svg>
+          <h3 class="pillar-title">Signal Layer</h3>
+          <p class="pillar-desc">Ingests 8,000+ enterprise signals across email, Slack, tickets, docs, CRM, git</p>
+        </div>
+
+        <!-- Pillar 2: Reflection Loop -->
+        <div class="pillar-card reveal reveal-delay-2">
+          <div class="pillar-number">02</div>
+          <svg class="pillar-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="24" cy="24" r="16"/>
+            <path d="M24 14v10l7 7"/>
+            <circle cx="24" cy="24" r="2" fill="currentColor"/>
+          </svg>
+          <h3 class="pillar-title">Reflection Loop</h3>
+          <p class="pillar-desc">Claude Sonnet 4.5 clusters signals and discovers capability gaps</p>
+        </div>
+
+        <!-- Pillar 3: Generator -->
+        <div class="pillar-card reveal reveal-delay-3">
+          <div class="pillar-number">03</div>
+          <svg class="pillar-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="8" width="32" height="32" rx="4"/>
+            <path d="M16 20h16M16 28h10"/>
+            <path d="M36 16l4-4M36 24l6 0M36 32l4 4"/>
+          </svg>
+          <h3 class="pillar-title">Generator</h3>
+          <p class="pillar-desc">Produces complete capability code, manifests, and evaluation suites</p>
+        </div>
+
+        <!-- Pillar 4: Arena -->
+        <div class="pillar-card reveal reveal-delay-1">
+          <div class="pillar-number">04</div>
+          <svg class="pillar-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="24,4 44,16 44,32 24,44 4,32 4,16"/>
+            <polygon points="24,12 36,19 36,31 24,38 12,31 12,19" opacity="0.5"/>
+            <circle cx="24" cy="24" r="4" fill="currentColor" opacity="0.7"/>
+          </svg>
+          <h3 class="pillar-title">Arena</h3>
+          <p class="pillar-desc">Evaluates capabilities in a sandboxed environment with fitness scoring</p>
+        </div>
+
+        <!-- Pillar 5: Evolution Engine -->
+        <div class="pillar-card reveal reveal-delay-2">
+          <div class="pillar-number">05</div>
+          <svg class="pillar-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 36 C 8 36, 16 36, 20 28 S 28 12, 40 12"/>
+            <circle cx="8" cy="36" r="3"/>
+            <circle cx="40" cy="12" r="3"/>
+            <path d="M36 8l4 4-4 4" fill="none"/>
+          </svg>
+          <h3 class="pillar-title">Evolution Engine</h3>
+          <p class="pillar-desc">Promotes capabilities through lifecycle stages based on fitness</p>
+        </div>
+
+        <!-- Pillar 6: Governance Council -->
+        <div class="pillar-card reveal reveal-delay-3">
+          <div class="pillar-number">06</div>
+          <svg class="pillar-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="22" width="32" height="20" rx="3"/>
+            <path d="M16 22v-6a8 8 0 0 1 16 0v6"/>
+            <circle cx="24" cy="33" r="3"/>
+            <line x1="24" y1="36" x2="24" y2="38"/>
+          </svg>
+          <h3 class="pillar-title">Governance Council</h3>
+          <p class="pillar-desc">SHA-256 hash-chained audit ledger. Every action auditable.</p>
+        </div>
+
+        <!-- Pillar 7: Agent Gateway -->
+        <div class="pillar-card reveal reveal-delay-1">
+          <div class="pillar-number">07</div>
+          <svg class="pillar-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="14" cy="24" r="6"/>
+            <circle cx="34" cy="24" r="6"/>
+            <path d="M20 24h8"/>
+            <path d="M14 14v-4M14 34v4M34 14v-4M34 34v4"/>
+            <path d="M6 24H4M44 24h-2"/>
+          </svg>
+          <h3 class="pillar-title">Agent Gateway</h3>
+          <p class="pillar-desc">Vendor and customer agents interact through trust-verified boundaries</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider" aria-hidden="true"></div>
+
+  <!-- SECTION 4: LIVE PROOF -->
+  <section class="proof" id="demo" aria-labelledby="proof-title">
+    <div class="container">
+      <div class="proof-header">
+        <div class="section-label reveal">Live Proof</div>
+        <h2 class="section-title reveal" id="proof-title">This is not a pitch deck.<br>This is running software.</h2>
+      </div>
+
+      <div class="proof-metrics">
+        <div class="proof-metric reveal reveal-delay-1">
+          <div class="proof-metric-value" data-count="8015">8,015</div>
+          <div class="proof-metric-label">Signals ingested</div>
+        </div>
+        <div class="proof-metric reveal reveal-delay-2">
+          <div class="proof-metric-value">3</div>
+          <div class="proof-metric-label">Capability gaps detected by Claude</div>
+        </div>
+        <div class="proof-metric reveal reveal-delay-3">
+          <div class="proof-metric-value">6/10</div>
+          <div class="proof-metric-label">Eval cases passed in sandbox</div>
+        </div>
+        <div class="proof-metric reveal reveal-delay-4">
+          <div class="proof-metric-value">0.668</div>
+          <div class="proof-metric-label">Fitness score, generation 3</div>
+        </div>
+      </div>
+
+      <p class="proof-explanation reveal">
+        Every number above comes from a real PostgreSQL database running right now. Every capability gap was discovered by Claude Sonnet 4.5 analyzing real enterprise signals. The vendor risk triage agent was generated, evaluated in a sandboxed environment, and promoted through governance — all autonomously.
+      </p>
+
+      <a href="https://www.perplexity.ai/computer/a/fluid-enterprise-self-evolving-AjKstajoRvmPDoogEI3ISw" class="btn btn--primary reveal" target="_blank" rel="noopener">Open the Live App →</a>
+
+      <!-- Pitch video placeholder -->
+      <a href="#pitch-video" class="pitch-video-container reveal" aria-label="Watch the 3-Minute Pitch">
+        <div class="pitch-video-bg" aria-hidden="true"></div>
+        <div class="pitch-video-content">
+          <div class="pitch-video-play">
+            <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </div>
+          <span class="pitch-video-label">3-Minute Pitch</span>
+          <span class="pitch-video-sublabel">The Fluid Enterprise — Billion Dollar Build</span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <div class="section-divider" aria-hidden="true"></div>
+
+  <!-- SECTION 5: THE META-STORY -->
+  <section class="meta" aria-labelledby="meta-title">
+    <div class="container">
+      <div class="section-label reveal">The Meta-Story</div>
+      <h2 class="section-title reveal" id="meta-title">Built with Perplexity Computer.<br>In one session.</h2>
+
+      <div class="meta-content">
+        <p class="meta-text reveal">
+          This entire platform — 3,500 lines of Python, 9,600 lines of TypeScript, PostgreSQL with pgvector, Redis streams, Claude API integration, HDBSCAN clustering, sandbox evaluation, hash-chained governance — was built in a single Perplexity Computer session.
+        </p>
+
+        <div class="meta-stats reveal">
+          <div class="meta-stat">
+            <div class="meta-stat-value">15</div>
+            <div class="meta-stat-label">Commits</div>
+          </div>
+          <div class="meta-stat">
+            <div class="meta-stat-value">29</div>
+            <div class="meta-stat-label">API Endpoints</div>
+          </div>
+          <div class="meta-stat">
+            <div class="meta-stat-value">8</div>
+            <div class="meta-stat-label">Pages</div>
+          </div>
+          <div class="meta-stat">
+            <div class="meta-stat-value">0</div>
+            <div class="meta-stat-label">Prior Code</div>
+          </div>
+        </div>
+
+        <p class="meta-highlight reveal">
+          The platform does for enterprises what Perplexity Computer did for building it: replaces months of manual work with self-evolving intelligence.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider" aria-hidden="true"></div>
+
+  <!-- SECTION 6: BUSINESS MODEL -->
+  <section class="business" aria-labelledby="business-title">
+    <div class="container">
+      <div class="section-label reveal">Business Model</div>
+      <h2 class="section-title reveal" id="business-title">Path to $1B</h2>
+
+      <div class="business-grid">
+        <!-- Market Column -->
+        <div class="business-col reveal reveal-delay-1">
+          <div class="business-col-title">Market</div>
+          <div class="business-item">
+            <div class="business-item-label">TAM</div>
+            <div class="business-item-value">$500B enterprise software</div>
+          </div>
+          <div class="business-item">
+            <div class="business-item-label">SAM</div>
+            <div class="business-item-value">$80B — procurement, finance, supply chain automation</div>
+          </div>
+          <div class="business-item">
+            <div class="business-item-label">SOM</div>
+            <div class="business-item-value">$2B — agent-first platforms, year 3</div>
+          </div>
+        </div>
+
+        <!-- Revenue Column -->
+        <div class="business-col reveal reveal-delay-2">
+          <div class="business-col-title">Revenue</div>
+          <div class="business-item">
+            <div class="business-item-label">Platform fee</div>
+            <div class="business-item-value">$120K–600K/year per enterprise</div>
+          </div>
+          <div class="business-item">
+            <div class="business-item-label">Per-capability pricing</div>
+            <div class="business-item-value">$5K–50K/capability/year</div>
+          </div>
+          <div class="business-item">
+            <div class="business-item-label">Agent Gateway transactions</div>
+            <div class="business-item-value">$0.01–0.10 per interaction</div>
+          </div>
+          <div class="business-item">
+            <div class="business-item-label">Target</div>
+            <div class="business-item-value business-item-value--highlight">2,000 customers × $500K avg = $1B ARR</div>
+          </div>
+        </div>
+
+        <!-- Moat Column -->
+        <div class="business-col reveal reveal-delay-3">
+          <div class="business-col-title">Moat</div>
+          <div class="business-item">
+            <div class="business-item-label">Self-evolution</div>
+            <div class="business-item-value">Capabilities improve autonomously every generation</div>
+          </div>
+          <div class="business-item">
+            <div class="business-item-label">EigenTrust</div>
+            <div class="business-item-value">Trust earned through behavior, not assigned</div>
+          </div>
+          <div class="business-item">
+            <div class="business-item-label">Hash-chained governance</div>
+            <div class="business-item-value">Immutable audit trail, compliance-ready</div>
+          </div>
+          <div class="business-item">
+            <div class="business-item-label">Network effects</div>
+            <div class="business-item-value">Capabilities shared across the marketplace</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider" aria-hidden="true"></div>
+
+  <!-- COMPETITIVE MOAT -->
+  <section class="moat" id="moat" aria-labelledby="moat-title">
+    <div class="container">
+      <div class="section-label reveal">Competitive Moat</div>
+      <h2 class="section-title reveal" id="moat-title">Four walls. Zero gaps.</h2>
+
+      <div class="moat-grid">
+        <!-- Card 1: Self-Evolution Flywheel -->
+        <div class="moat-card reveal reveal-delay-1">
+          <svg class="moat-icon" viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 8a14 14 0 0 1 13.5 10.3"/>
+            <path d="M35.5 18.3l2.5-4.5-4.5-2.5"/>
+            <path d="M22 36a14 14 0 0 1-13.5-10.3"/>
+            <path d="M8.5 25.7l-2.5 4.5 4.5 2.5"/>
+          </svg>
+          <h3 class="moat-title">Self-Evolution Flywheel</h3>
+          <p class="moat-desc">Every enterprise signal makes the system smarter. Every generated capability trains the next generation. Traditional platforms depreciate. Fluid Enterprise appreciates.</p>
+        </div>
+
+        <!-- Card 2: Capability Genome Network -->
+        <div class="moat-card reveal reveal-delay-2">
+          <svg class="moat-icon" viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="6" x2="22" y2="38"/>
+            <path d="M14 10 C 14 10, 30 14, 30 18 S 14 22, 14 26 S 30 30, 30 34"/>
+            <path d="M30 10 C 30 10, 14 14, 14 18 S 30 22, 30 26 S 14 30, 14 34"/>
+            <circle cx="22" cy="6" r="2" fill="currentColor"/>
+            <circle cx="22" cy="38" r="2" fill="currentColor"/>
+          </svg>
+          <h3 class="moat-title">Capability Genome Network</h3>
+          <p class="moat-desc">A marketplace of proven capability genomes. Cross-enterprise learning without data sharing. The more companies that join, the faster everyone evolves.</p>
+        </div>
+
+        <!-- Card 3: Zero-Trust Agent Commerce -->
+        <div class="moat-card reveal reveal-delay-3">
+          <svg class="moat-icon" viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 4 L36 10 L36 22 C36 30 29 37 22 40 C15 37 8 30 8 22 L8 10 Z"/>
+            <path d="M15 22l5 5 9-9"/>
+          </svg>
+          <h3 class="moat-title">Zero-Trust Agent Commerce</h3>
+          <p class="moat-desc">EigenTrust-scored boundaries for vendor and customer agents. Trust is earned through behavior, not assigned by admins. The protocol, not a feature.</p>
+        </div>
+
+        <!-- Card 4: Governance as DNA -->
+        <div class="moat-card reveal reveal-delay-4">
+          <svg class="moat-icon" viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="14" cy="14" r="5"/>
+            <circle cx="30" cy="14" r="5"/>
+            <circle cx="30" cy="30" r="5"/>
+            <circle cx="14" cy="30" r="5"/>
+            <line x1="19" y1="14" x2="25" y2="14"/>
+            <line x1="19" y1="30" x2="25" y2="30"/>
+            <line x1="14" y1="19" x2="14" y2="25"/>
+            <line x1="30" y1="19" x2="30" y2="25"/>
+          </svg>
+          <h3 class="moat-title">Governance as DNA</h3>
+          <p class="moat-desc">SHA-256 hash-chained audit trail baked into every action. Not a compliance bolt-on — governance is how the system breathes. SOC 2 and ISO 27001 ready from day one.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider" aria-hidden="true"></div>
+
+  <!-- SECTION 7: COMPETITIVE LANDSCAPE -->
+  <section class="competitive" aria-labelledby="competitive-title">
+    <div class="container">
+      <div class="section-label reveal">Competitive Landscape</div>
+      <h2 class="section-title reveal" id="competitive-title">Why this is different</h2>
+
+      <div class="comp-table-wrapper reveal">
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th>Traditional ERP</th>
+              <th>Agent Wrappers<br><span style="font-weight: 400; font-size: 0.75rem;">(CrewAI, LangGraph)</span></th>
+              <th>Fluid Enterprise</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Learns from data</td>
+              <td class="comp-no">No</td>
+              <td class="comp-no">No</td>
+              <td class="comp-yes">Yes — self-play</td>
+            </tr>
+            <tr>
+              <td>Generates capabilities</td>
+              <td class="comp-no">No</td>
+              <td class="comp-no">No</td>
+              <td class="comp-yes">Yes — Claude + sandbox</td>
+            </tr>
+            <tr>
+              <td>Evolves autonomously</td>
+              <td class="comp-no">No</td>
+              <td class="comp-no">No</td>
+              <td class="comp-yes">Yes — fitness-based</td>
+            </tr>
+            <tr>
+              <td>Governance built-in</td>
+              <td class="comp-partial">Partial</td>
+              <td class="comp-no">No</td>
+              <td class="comp-yes">Yes — hash-chained</td>
+            </tr>
+            <tr>
+              <td>Vendor/customer agents</td>
+              <td class="comp-no">No</td>
+              <td class="comp-no">No</td>
+              <td class="comp-yes">Yes — A2A Gateway</td>
+            </tr>
+            <tr>
+              <td>Open source</td>
+              <td class="comp-no">No</td>
+              <td class="comp-yes">Yes</td>
+              <td class="comp-yes">Yes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider" aria-hidden="true"></div>
+
+  <!-- SECTION 8: TEAM -->
+  <section class="team" aria-labelledby="team-title">
+    <div class="container">
+      <div class="section-label reveal">Team</div>
+      <h2 class="section-title reveal" id="team-title">Builder</h2>
+
+      <div class="team-card reveal">
+        <div class="team-avatar">HR</div>
+        <div class="team-info">
+          <h3>Hemanth Raganti</h3>
+          <div class="team-info-role">Chief Technology Architect · AI/ML Strategy</div>
+          <p class="team-info-bio">"Building the operating model for the post-software enterprise"</p>
+          <a href="https://github.com/Regantih/fluid-enterprise" class="team-info-link" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+            github.com/Regantih/fluid-enterprise
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 9: CTA -->
+  <section class="cta" aria-labelledby="cta-title">
+    <div class="container">
+      <h2 class="reveal" id="cta-title">Stop configuring. Start evolving.</h2>
+      <p class="cta-sub reveal reveal-delay-1">The first platform where capabilities are genomes, fitness is the objective function, and every generation is measurably better than the last.</p>
+
+      <div class="cta-buttons reveal reveal-delay-2">
+        <a href="https://www.perplexity.ai/computer/a/fluid-enterprise-self-evolving-AjKstajoRvmPDoogEI3ISw" class="btn btn--primary" target="_blank" rel="noopener">Try the Live App</a>
+        <a href="https://github.com/Regantih/fluid-enterprise" class="btn btn--secondary" target="_blank" rel="noopener">View on GitHub</a>
+        <a href="https://github.com/Regantih/fluid-enterprise" class="btn btn--ghost" target="_blank" rel="noopener">Read the Documentation</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <p class="footer-text">© 2026 The Fluid Enterprise. Built with Perplexity Computer.</p>
+    </div>
+  </footer>
+
+  <script>
+    // ===== INTERSECTION OBSERVER FOR SCROLL ANIMATIONS =====
+    (function() {
+      const reveals = document.querySelectorAll('.reveal');
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      }, {
+        threshold: 0.1,
+        rootMargin: '0px 0px -60px 0px'
+      });
+
+      reveals.forEach(el => observer.observe(el));
+    })();
+
+    // ===== HERO PARTICLE NETWORK CANVAS =====
+    (function() {
+      const canvas = document.getElementById('heroCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let w, h, particles, animFrame;
+      const PARTICLE_COUNT = 60;
+      const CONNECTION_DIST = 150;
+      const CYAN = { r: 14, g: 165, b: 233 };
+
+      function resize() {
+        const dpr = window.devicePixelRatio || 1;
+        w = canvas.parentElement.clientWidth;
+        h = canvas.parentElement.clientHeight;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.scale(dpr, dpr);
+      }
+
+      function createParticles() {
+        particles = [];
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          particles.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            vx: (Math.random() - 0.5) * 0.4,
+            vy: (Math.random() - 0.5) * 0.4,
+            r: Math.random() * 2 + 1,
+            opacity: Math.random() * 0.3 + 0.1
+          });
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, w, h);
+
+        // Draw connections
+        for (let i = 0; i < particles.length; i++) {
+          for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < CONNECTION_DIST) {
+              const alpha = (1 - dist / CONNECTION_DIST) * 0.12;
+              ctx.strokeStyle = `rgba(${CYAN.r}, ${CYAN.g}, ${CYAN.b}, ${alpha})`;
+              ctx.lineWidth = 0.5;
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.stroke();
+            }
+          }
+        }
+
+        // Draw particles
+        for (const p of particles) {
+          ctx.fillStyle = `rgba(${CYAN.r}, ${CYAN.g}, ${CYAN.b}, ${p.opacity})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Update positions
+        for (const p of particles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0 || p.x > w) p.vx *= -1;
+          if (p.y < 0 || p.y > h) p.vy *= -1;
+        }
+
+        animFrame = requestAnimationFrame(draw);
+      }
+
+      // Reduce particle count on mobile
+      const isMobile = window.innerWidth < 768;
+      if (isMobile) {
+        // Fewer particles on mobile
+        for (let i = PARTICLE_COUNT; i > 30; i--) {
+          // Handled by reducing count
+        }
+      }
+
+      resize();
+      createParticles();
+      draw();
+
+      window.addEventListener('resize', () => {
+        resize();
+        createParticles();
+      });
+
+      // Pause when not visible
+      const heroObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) {
+            cancelAnimationFrame(animFrame);
+          } else {
+            draw();
+          }
+        });
+      });
+      heroObserver.observe(canvas.parentElement);
+    })();
+
+    // ===== COUNTER ANIMATION FOR METRICS =====
+    (function() {
+      const counterEls = document.querySelectorAll('[data-count]');
+      const counterObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const el = entry.target;
+            const target = parseInt(el.dataset.count);
+            const duration = 1500;
+            const start = performance.now();
+
+            function update(now) {
+              const elapsed = now - start;
+              const progress = Math.min(elapsed / duration, 1);
+              const eased = 1 - Math.pow(1 - progress, 3);
+              const current = Math.floor(eased * target);
+              el.textContent = current.toLocaleString();
+              if (progress < 1) requestAnimationFrame(update);
+            }
+
+            requestAnimationFrame(update);
+            counterObserver.unobserve(el);
+          }
+        });
+      }, { threshold: 0.5 });
+
+      counterEls.forEach(el => counterObserver.observe(el));
+    })();
+
+    // ===== SMOOTH SCROLL FOR ANCHOR LINKS =====
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
