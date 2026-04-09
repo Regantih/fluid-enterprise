@@ -98,7 +98,7 @@ export default function GovernanceBoard() {
   const { toast } = useToast();
 
   // ── Section 1 state ────────────────────────────────────────────────────────
-  const [selectedGapId, setSelectedGapId] = useState<number | null>(null);
+  const [selectedGapId, setSelectedGapId] = useState<string | null>(null);
   const [generatedCapId, setGeneratedCapId] = useState<Record<number, number>>({});
   const [generateResults, setGenerateResults] = useState<Record<number, any>>({});
   const [arenaResults, setArenaResults] = useState<Record<number, any>>({});
@@ -118,10 +118,11 @@ export default function GovernanceBoard() {
     refetchInterval: 5000,
   });
 
-  const { data: evidenceSignals, isLoading: evidenceLoading } = useQuery<any[]>({
+  const { data: evidenceData, isLoading: evidenceLoading } = useQuery<any>({
     queryKey: [`/api/gaps/${selectedGapId}/signals`],
     enabled: selectedGapId !== null && showEvidence,
   });
+  const evidenceSignals = evidenceData?.signals ?? evidenceData ?? [];
 
   const { data: realCaps, isLoading: capsLoading } = useQuery<any[]>({
     queryKey: ["/api/real/capabilities"],
@@ -542,9 +543,9 @@ export default function GovernanceBoard() {
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-400">
                         {sig.source ?? sig.kind ?? "signal"}
                       </span>
-                      {sig.createdAt && (
+                      {(sig.createdAt || sig.ingested_at) && (
                         <span className="text-[10px] text-muted-foreground font-mono ml-auto">
-                          {timeAgo(sig.createdAt)}
+                          {timeAgo(sig.createdAt || sig.ingested_at)}
                         </span>
                       )}
                     </div>
