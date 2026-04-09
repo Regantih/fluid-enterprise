@@ -100,39 +100,12 @@ export default function GovernanceBoard() {
 
   // ── Section 1 state ────────────────────────────────────────────────────────
   const [selectedGapId, setSelectedGapId] = useState<string | null>(null);
-  const [generatedCapId, setGeneratedCapId] = useState<Record<number, number>>(() => {
-    try {
-      const saved = localStorage.getItem("fluid-governance-state");
-      return saved ? JSON.parse(saved).generatedCapId ?? {} : {};
-    } catch { return {}; }
-  });
-  const [generateResults, setGenerateResults] = useState<Record<number, any>>(() => {
-    try {
-      const saved = localStorage.getItem("fluid-governance-state");
-      return saved ? JSON.parse(saved).generateResults ?? {} : {};
-    } catch { return {}; }
-  });
-  const [arenaResults, setArenaResults] = useState<Record<number, any>>(() => {
-    try {
-      const saved = localStorage.getItem("fluid-governance-state");
-      return saved ? JSON.parse(saved).arenaResults ?? {} : {};
-    } catch { return {}; }
-  });
-  const [transitionDone, setTransitionDone] = useState<Record<number, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem("fluid-governance-state");
-      return saved ? JSON.parse(saved).transitionDone ?? {} : {};
-    } catch { return {}; }
-  });
+  const [generatedCapId, setGeneratedCapId] = useState<Record<number, number>>({});
+  const [generateResults, setGenerateResults] = useState<Record<number, any>>({});
+  const [arenaResults, setArenaResults] = useState<Record<number, any>>({});
+  const [transitionDone, setTransitionDone] = useState<Record<number, boolean>>({});
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "fluid-governance-state",
-        JSON.stringify({ generatedCapId, generateResults, arenaResults, transitionDone })
-      );
-    } catch { /* storage unavailable */ }
-  }, [generatedCapId, generateResults, arenaResults, transitionDone]);
+  // State persistence removed for deployment compatibility
   const [showEvidence, setShowEvidence] = useState(false);
   const [generatingGap, setGeneratingGap] = useState<number | null>(null);
   const [agentStream, setAgentStream] = useState<{ gapId: number; gapName: string } | null>(null);
