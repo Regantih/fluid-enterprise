@@ -190,6 +190,11 @@
     background: hsl(var(--muted-foreground));
   }
 
+  @keyframes slideInFromTop {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
   .no-default-hover-elevate {}
   .no-default-active-elevate {}
 

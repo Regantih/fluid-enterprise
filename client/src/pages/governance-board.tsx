@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AgentExecutionStream } from "@/components/AgentExecutionStream";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -134,6 +135,7 @@ export default function GovernanceBoard() {
   }, [generatedCapId, generateResults, arenaResults, transitionDone]);
   const [showEvidence, setShowEvidence] = useState(false);
   const [generatingGap, setGeneratingGap] = useState<number | null>(null);
+  const [agentStream, setAgentStream] = useState<{ gapId: number; gapName: string } | null>(null);
   const [arenaRunning, setArenaRunning] = useState<number | null>(null);
   const [transitioning, setTransitioning] = useState<number | null>(null);
 
@@ -392,24 +394,11 @@ export default function GovernanceBoard() {
                           size="sm"
                           variant="outline"
                           className="text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 text-xs h-7"
-                          onClick={() => {
-                            setGeneratingGap(gap.id);
-                            generateMutation.mutate(gap.id);
-                          }}
-                          disabled={isGenerating}
+                          onClick={() => setAgentStream({ gapId: gap.id, gapName: gap.suggested_name })}
                           data-testid={`gap-generate-${gap.id}`}
                         >
-                          {isGenerating ? (
-                            <>
-                              <Sparkles className="w-3 h-3 mr-1 animate-spin" />
-                              Generating…
-                            </>
-                          ) : (
-                            <>
-                              <Dna className="w-3 h-3 mr-1" />
-                              Generate Capability
-                            </>
-                          )}
+                          <Dna className="w-3 h-3 mr-1" />
+                          Generate Capability
                         </Button>
                       )}
 
@@ -523,6 +512,25 @@ export default function GovernanceBoard() {
           </div>
         )}
       </section>
+
+      {/* Agent Execution Stream Modal */}
+      {agentStream && (
+        <AgentExecutionStream
+          gapId={agentStream.gapId}
+          gapName={agentStream.gapName}
+          onComplete={(data: any) => {
+            const gapId = agentStream.gapId;
+            setGenerateResults(prev => ({ ...prev, [gapId]: data }));
+            if (data?.id) {
+              setGeneratedCapId(prev => ({ ...prev, [gapId]: data.id }));
+            }
+            queryClient.invalidateQueries({ queryKey: ["/api/gaps"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/real/capabilities"] });
+            toast({ title: "Capability generated", description: data?.name ?? "" });
+          }}
+          onClose={() => setAgentStream(null)}
+        />
+      )}
 
       {/* Evidence Drawer */}
       {showEvidence && selectedGapId !== null && (

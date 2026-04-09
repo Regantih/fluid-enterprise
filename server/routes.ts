@@ -372,6 +372,55 @@ export function registerRoutes(server: Server, app: Express): void {
     catch (e: any) { res.status(502).json({ error: e.message }); }
   });
 
+  // ═══ SSE STREAMING: proxy directly to FastAPI without buffering ═══
+  app.post("/api/generator/stream", async (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    try {
+      const upstream = await fetch(`${FASTAPI}/api/generator/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body),
+      });
+      if (!upstream.body) { res.end(); return; }
+      const reader = upstream.body.getReader();
+      req.on("close", () => reader.cancel());
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+      res.end();
+    } catch (e: any) {
+      res.write(`data: {"type":"error","content":"${e.message}"}\n\n`);
+      res.end();
+    }
+  });
+
+  app.get("/api/agents/activity/stream", async (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    try {
+      const upstream = await fetch(`${FASTAPI}/api/agents/activity/stream`);
+      if (!upstream.body) { res.end(); return; }
+      const reader = upstream.body.getReader();
+      req.on("close", () => reader.cancel());
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+      res.end();
+    } catch (e: any) {
+      res.write(`data: {"agent":"System","action":"Activity feed unavailable: ${e.message}","severity":"warning"}\n\n`);
+      res.end();
+    }
+  });
+
   // ═══ ALL PAGES: proxy to FastAPI (real Postgres data) ═══
   const proxyAll = [
     "dashboard", "capabilities", "agents", "heartbeat",

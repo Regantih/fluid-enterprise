@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { AgentPulse } from "./AgentPulse";
 import {
   LayoutDashboard,
   Database,
@@ -105,6 +106,9 @@ export function AppSidebar() {
           );
         })}
       </nav>
+
+      {/* Agent Activity Feed */}
+      <AgentPulse />
 
       {/* Bottom: Evolution Indicator */}
       <div className="px-4 py-4 border-t border-[hsl(225,20%,12%)]">
